@@ -112,8 +112,10 @@
   --edge-pending: oklch(0.60 0.02 140);
   /* Canvas chrome (read via getComputedStyle for SVG attributes) */
   --canvas-dots: oklch(0.85 0.012 125);
-  --minimap-bg: oklch(0.988 0.005 120);
-  --minimap-mask: oklch(0.967 0.009 120 / 70%);
+  --minimap-bg: oklch(0.95 0.01 120);
+  --minimap-mask: oklch(0.458 0.085 155 / 15%);
+  --minimap-node: oklch(0.86 0.015 125);
+  --minimap-node-stroke: oklch(0.75 0.02 125);
   /* Sprout mascot palette (fixed illustration ink; leaves brighten in dark) */
   --mascot-leaf: oklch(0.52 0.1 152);
   --mascot-leaf-light: oklch(0.72 0.11 150);
@@ -172,8 +174,10 @@
   --edge-blocked: oklch(0.75 0.11 85);
   --edge-pending: oklch(0.55 0.016 140);
   --canvas-dots: oklch(0.32 0.012 145);
-  --minimap-bg: oklch(0.245 0.014 155);
-  --minimap-mask: oklch(0.205 0.012 155 / 70%);
+  --minimap-bg: oklch(0.18 0.012 155);
+  --minimap-mask: oklch(0.72 0.12 152 / 20%);
+  --minimap-node: oklch(0.32 0.015 150);
+  --minimap-node-stroke: oklch(0.45 0.02 150);
   --mascot-leaf: oklch(0.6 0.11 152);
   --mascot-leaf-light: oklch(0.76 0.12 150);
 }
@@ -195,28 +199,70 @@
    --------------------------------------------------------------- */
 .react-flow__controls {
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 2px oklch(0 0 0 / 0.05);
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  background: var(--card) !important;
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.12) !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .react-flow__controls-button {
-  background-color: var(--card);
-  color: var(--foreground);
-  border-bottom: 1px solid var(--border);
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  border-bottom: 1px solid var(--border) !important;
+  fill: var(--foreground) !important;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 6px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
 }
 
 .react-flow__controls-button:hover {
-  background-color: var(--muted);
+  background: var(--muted) !important;
+  color: var(--foreground) !important;
 }
 
 .react-flow__controls-button svg {
-  fill: currentColor;
+  fill: currentColor !important;
+  color: var(--foreground) !important;
+  max-width: 14px !important;
+  max-height: 14px !important;
+}
+
+.react-flow__controls-button:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
 }
 
 .react-flow__minimap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  background: var(--card) !important;
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.12) !important;
+}
+
+.react-flow__minimap-mask {
+  stroke: var(--primary) !important;
+  stroke-width: 1.5px !important;
+  stroke-dasharray: 4 2 !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--ring);
+}
+
+.react-flow__attribution {
+  background: transparent;
+  color: var(--muted-foreground);
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
@@ -230,6 +276,15 @@
 
 .react-flow__node {
   font-family: var(--font-geist-sans), sans-serif;
+}
+
+/* Course node selected/drag ring — unlayered on purpose so it beats utilities */
+.react-flow__node.selected .course-node-card,
+.react-flow__node.dragging .course-node-card {
+  border-color: var(--ring);
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--ring) 40%, transparent),
+    0 1px 2px oklch(0 0 0 / 0.05);
 }
 
 /* ---------------------------------------------------------------

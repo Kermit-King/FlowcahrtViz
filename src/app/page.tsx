@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useCourseStore } from "@/store/courseStore";
 import FileUpload from "@/components/FileUpload";
 import CurriculumFlow from "@/components/CurriculumFlow";
@@ -7,11 +8,12 @@ import DashboardRail from "@/components/DashboardRail";
 import Mascot from "@/components/Mascot";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { PanelLeft, Trash2 } from "lucide-react";
 
 export default function Home() {
   const courses = useCourseStore((state) => state.courses);
   const setCourses = useCourseStore((state) => state.setCourses);
+  const [railOpen, setRailOpen] = useState(true);
 
   const handleClearCurriculum = () => {
     setCourses([]);
@@ -21,8 +23,20 @@ export default function Home() {
     <main className="flex min-h-dvh flex-col bg-background text-foreground">
       {/* Header - solid paper background, whisper border, no glass */}
       <header className="sticky top-0 z-40 border-b border-border bg-background">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+        <div className="flex h-16 w-full items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
+            {courses.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setRailOpen(!railOpen)}
+                aria-label={railOpen ? "Close sidebar" : "Open sidebar"}
+                title={railOpen ? "Close sidebar" : "Open sidebar"}
+                className="mr-1 hidden sm:flex text-muted-foreground hover:text-foreground"
+              >
+                <PanelLeft className="size-4" />
+              </Button>
+            )}
             <Mascot size={36} className="shrink-0" />
             <div className="min-w-0">
               <p className="font-heading text-lg font-semibold leading-tight tracking-tight">
@@ -35,6 +49,18 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-1.5">
+            {courses.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setRailOpen(!railOpen)}
+                aria-label={railOpen ? "Close sidebar" : "Open sidebar"}
+                title={railOpen ? "Close sidebar" : "Open sidebar"}
+                className="sm:hidden text-muted-foreground hover:text-foreground"
+              >
+                <PanelLeft className="size-4" />
+              </Button>
+            )}
             <ThemeToggle />
             {courses.length > 0 && (
               <Button
@@ -70,11 +96,24 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        /* Dashboard - full-bleed canvas with a floating simulator rail */
-        <div className="p-3 sm:p-4 lg:h-[calc(100dvh_-_4rem)] lg:overflow-hidden">
-          <div className="relative h-[70dvh] w-full lg:h-full">
+        /* Dashboard - docked sidebar with full-bleed canvas */
+        <div className="flex h-[calc(100dvh_-_4rem)] w-full overflow-hidden">
+          <DashboardRail open={railOpen} onOpenChange={setRailOpen} />
+          <div className="relative flex-1 h-full w-full overflow-hidden bg-background">
+            {!railOpen && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => setRailOpen(true)}
+                aria-label="Open simulator sidebar"
+                title="Open simulator sidebar"
+                className="absolute left-3 top-3 z-20 bg-card shadow-sm hover:bg-muted"
+              >
+                <PanelLeft className="size-4" />
+              </Button>
+            )}
             <CurriculumFlow />
-            <DashboardRail />
           </div>
         </div>
       )}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 const ACCEPTED_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"];
 const FILE_TYPE_HINTS = ["PDF", "PNG", "JPG", "WebP", "HEIC"];
 
-export default function FileUpload({ onUploadComplete }: { onUploadComplete: (data: { courses: Array<{ code: string; title: string; units: number; year: number; term: number; prerequisites: string[] }> }) => void }) {
+  export default function FileUpload({ onUploadComplete }: { onUploadComplete: (data: { courses: Array<{ code: string; title: string; units: number; year: number; term: number; prerequisites: string[]; softPrerequisites?: string[] }> }) => void }) {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -15,7 +15,7 @@ import { useCourseStore } from "@/store/courseStore";
 import { Course } from "@/lib/graphUtils";
 import CourseNode from "./CourseNode";
 import { Button } from "./ui/button";
-import { ArrowDown, ArrowRight, LayoutGrid, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowRight, LayoutGrid, RotateCcw, Table, Workflow } from "lucide-react";
 
 const nodeTypes = {
   courseNode: CourseNode,
@@ -30,6 +30,11 @@ const STATUS_LEGEND = [
   { label: "Pending", dot: "bg-status-pending" },
 ] as const;
 
+const PREREQ_LEGEND = [
+  { label: "Hard prereq", line: "solid" },
+  { label: "Soft prereq", line: "dashed" },
+] as const;
+
 type CourseStatus = Course["status"];
 
 interface ChartColors {
@@ -42,19 +47,19 @@ interface ChartColors {
 
 const LIGHT_CHART_COLORS: ChartColors = {
   dots: "oklch(0.85 0.012 125)",
-  minimapBg: "oklch(0.988 0.005 120)",
-  minimapMask: "oklch(0.967 0.009 120 / 70%)",
+  minimapBg: "oklch(0.95 0.01 120)",
+  minimapMask: "oklch(0.458 0.085 155 / 15%)",
   stroke: {
     passed: "oklch(0.5 0.11 152)",
     failed: "oklch(0.5 0.18 27)",
     blocked: "oklch(0.505 0.105 80)",
-    pending: "oklch(0.885 0.014 125)",
+    pending: "oklch(0.75 0.02 125)",
   },
   fill: {
-    passed: "oklch(0.93 0.035 150)",
-    failed: "oklch(0.93 0.03 25)",
-    blocked: "oklch(0.94 0.04 90)",
-    pending: "oklch(0.988 0.005 120)",
+    passed: "oklch(0.85 0.08 150)",
+    failed: "oklch(0.85 0.08 25)",
+    blocked: "oklch(0.86 0.08 90)",
+    pending: "oklch(0.86 0.015 125)",
   },
 };
 
@@ -71,28 +76,29 @@ function statusOfNode(node: Node): CourseStatus {
 }
 
 function readChartColors(): ChartColors {
+  if (typeof document === "undefined") return LIGHT_CHART_COLORS;
   const styles = getComputedStyle(document.documentElement);
   const read = (name: string) => styles.getPropertyValue(name).trim();
   return {
-    dots: read("--canvas-dots"),
-    minimapBg: read("--minimap-bg"),
-    minimapMask: read("--minimap-mask"),
+    dots: read("--canvas-dots") || LIGHT_CHART_COLORS.dots,
+    minimapBg: read("--minimap-bg") || LIGHT_CHART_COLORS.minimapBg,
+    minimapMask: read("--minimap-mask") || LIGHT_CHART_COLORS.minimapMask,
     stroke: {
-      passed: read("--status-passed"),
-      failed: read("--status-failed"),
-      blocked: read("--status-blocked"),
-      pending: read("--border"),
+      passed: read("--status-passed") || LIGHT_CHART_COLORS.stroke.passed,
+      failed: read("--status-failed") || LIGHT_CHART_COLORS.stroke.failed,
+      blocked: read("--status-blocked") || LIGHT_CHART_COLORS.stroke.blocked,
+      pending: read("--minimap-node-stroke") || read("--border") || LIGHT_CHART_COLORS.stroke.pending,
     },
     fill: {
-      passed: read("--tint-passed"),
-      failed: read("--tint-failed"),
-      blocked: read("--tint-blocked"),
-      pending: read("--card"),
+      passed: read("--status-passed") || LIGHT_CHART_COLORS.fill.passed,
+      failed: read("--status-failed") || LIGHT_CHART_COLORS.fill.failed,
+      blocked: read("--status-blocked") || LIGHT_CHART_COLORS.fill.blocked,
+      pending: read("--minimap-node") || read("--muted") || LIGHT_CHART_COLORS.fill.pending,
     },
   };
 }
 
-let chartColorsKey = "";
+let chartColorsKey = "__unset__";
 let chartColorsCache: ChartColors = LIGHT_CHART_COLORS;
 
 /**
@@ -151,6 +157,8 @@ function CurriculumCanvas() {
   const setLayoutDirection = useCourseStore(
     (state) => state.setLayoutDirection
   );
+  const layoutMode = useCourseStore((state) => state.layoutMode);
+  const setLayoutMode = useCourseStore((state) => state.setLayoutMode);
   const chartColors = useChartColors();
   const { fitView } = useReactFlow();
 
@@ -179,7 +187,31 @@ function CurriculumCanvas() {
 
   useEffect(() => {
     fitView(FIT_VIEW_OPTIONS);
-  }, [layoutDirection, fitView]);
+  }, [layoutDirection, layoutMode, fitView]);
+
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const element = wrapperRef.current;
+    if (!element) return;
+
+    let lastWidth = element.clientWidth;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? element.clientWidth;
+      if (Math.abs(width - lastWidth) < 60) return;
+      lastWidth = width;
+      clearTimeout(timer);
+      timer = setTimeout(() => fitView(FIT_VIEW_OPTIONS), 150);
+    });
+
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
+  }, [fitView]);
 
   const handleResetStatuses = useCallback(() => {
     // Reset all courses status to pending
@@ -203,7 +235,10 @@ function CurriculumCanvas() {
     }`;
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-xl border border-border bg-muted/40 shadow-xs">
+    <div
+      ref={wrapperRef}
+      className="relative h-full w-full overflow-hidden rounded-xl border border-border bg-muted/40 shadow-xs"
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -228,6 +263,10 @@ function CurriculumCanvas() {
           maskColor={chartColors.minimapMask}
           nodeStrokeColor={(n) => chartColors.stroke[statusOfNode(n)]}
           nodeColor={(n) => chartColors.fill[statusOfNode(n)]}
+          nodeBorderRadius={4}
+          nodeStrokeWidth={1.5}
+          zoomable
+          pannable
           className="hidden overflow-hidden !rounded-lg sm:block"
         />
 
@@ -236,12 +275,41 @@ function CurriculumCanvas() {
           <div
             role="group"
             aria-label="Canvas tools"
-            className="flex items-center gap-2 rounded-xl border border-border bg-card p-1.5 shadow-xs"
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-1.5 shadow-xs"
           >
             <div
               role="group"
-              aria-label="Layout direction"
+              aria-label="Arrangement"
               className="flex gap-1 rounded-lg bg-muted p-1"
+            >
+              <button
+                type="button"
+                onClick={() => setLayoutMode("flow")}
+                aria-pressed={layoutMode === "flow"}
+                title="Arrange by prerequisites (Dagre flow)"
+                className={directionButtonClass(layoutMode === "flow")}
+              >
+                <Workflow className="size-3.5" />
+                <span className="hidden sm:inline">Flow</span>
+                <span className="sr-only sm:hidden">Prerequisite flow arrangement</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayoutMode("grid")}
+                aria-pressed={layoutMode === "grid"}
+                title="Arrange by term columns like the curriculum PDF"
+                className={directionButtonClass(layoutMode === "grid")}
+              >
+                <Table className="size-3.5" />
+                <span className="hidden sm:inline">Terms</span>
+                <span className="sr-only sm:hidden">Term-column arrangement</span>
+              </button>
+            </div>
+
+            <div
+              role="group"
+              aria-label="Layout direction"
+              className={`flex gap-1 rounded-lg bg-muted p-1 ${layoutMode === "grid" ? "hidden" : ""}`}
             >
               <button
                 type="button"
@@ -302,6 +370,20 @@ function CurriculumCanvas() {
                   <span
                     aria-hidden="true"
                     className={`size-2 rounded-full ${item.dot}`}
+                  />
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    {item.label}
+                  </span>
+                </li>
+              ))}
+              <li className="mx-0.5 h-3 w-px bg-border" aria-hidden="true" />
+              {PREREQ_LEGEND.map((item) => (
+                <li key={item.label} className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className={`h-0 w-3.5 border-t border-muted-foreground ${
+                      item.line === "dashed" ? "border-dashed" : ""
+                    }`}
                   />
                   <span className="text-[10px] font-medium text-muted-foreground">
                     {item.label}

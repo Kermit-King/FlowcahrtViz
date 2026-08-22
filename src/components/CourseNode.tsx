@@ -1,123 +1,173 @@
 import { memo } from "react";
 import { Handle, Position } from "reactflow";
-import { Check, X, RefreshCw } from "lucide-react";
+import { Ban, Check, Circle, RefreshCw, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCourseStore } from "@/store/courseStore";
 import { Course } from "@/lib/graphUtils";
 
+type CourseStatus = Course["status"];
+
+const CARD_STYLES: Record<CourseStatus, string> = {
+  passed: "border-status-passed/60 bg-tint-passed/50",
+  failed: "border-status-failed/60 bg-tint-failed/50",
+  blocked: "border-dashed border-status-blocked/60 bg-tint-blocked/50",
+  pending: "border-border bg-card hover:border-primary/50",
+};
+
+const EDGE_STYLES: Record<CourseStatus, string> = {
+  passed: "bg-status-passed",
+  failed: "bg-status-failed",
+  blocked: "bg-status-blocked",
+  pending: "",
+};
+
+const CHIP_STYLES: Record<CourseStatus, string> = {
+  passed: "bg-tint-passed text-status-passed ring-status-passed/30 hover:ring-status-passed/60",
+  failed: "bg-tint-failed text-status-failed ring-status-failed/30 hover:ring-status-failed/60",
+  blocked: "bg-tint-blocked text-status-blocked ring-status-blocked/30 hover:ring-status-blocked/60",
+  pending: "",
+};
+
+const STATUS_ICON: Record<CourseStatus, typeof Check> = {
+  passed: Check,
+  failed: X,
+  blocked: Ban,
+  pending: Circle,
+};
+
+const ACTION_TRANSITION =
+  "transition-[background-color,border-color,color,box-shadow,transform] duration-150";
+
 export default memo(function CourseNode({ data }: { data: { course: Course } }) {
   const updateCourseStatus = useCourseStore((state) => state.updateCourseStatus);
+  const layoutDirection = useCourseStore((state) => state.layoutDirection);
+  const isVertical = layoutDirection === "TB";
   const course = data.course;
+  const status = course.status;
+  const isSet = status !== "pending";
+  const StatusIcon = STATUS_ICON[status];
 
-  const getStatusStyles = () => {
-    switch (course.status) {
-      case "passed":
-        return "ring-0 border-status-passed/70 bg-tint-passed/70";
-      case "failed":
-        return "ring-0 border-status-failed/70 bg-tint-failed/70";
-      case "blocked":
-        return "ring-0 border-dashed border-status-blocked/70 bg-tint-blocked/60";
-      default:
-        return "ring-0 border-border bg-card hover:border-primary/50";
-    }
+  const handleReset = (e: { stopPropagation(): void }) => {
+    e.stopPropagation();
+    updateCourseStatus(course.code, "pending");
   };
 
-  const getBadgeStyles = () => {
-    switch (course.status) {
-      case "passed":
-        return "bg-card/80 text-status-passed border-status-passed/30";
-      case "failed":
-        return "bg-card/80 text-status-failed border-status-failed/30";
-      case "blocked":
-        return "bg-card/80 text-status-blocked border-status-blocked/30";
-      default:
-        return "bg-muted text-muted-foreground border-border";
-    }
-  };
+  const handleSetStatus =
+    (next: Exclude<CourseStatus, "pending">) =>
+    (e: { stopPropagation(): void }) => {
+      e.stopPropagation();
+      updateCourseStatus(course.code, next);
+    };
 
   return (
     <Card
-      className={`w-[220px] rounded-xl border shadow-xs transition-colors duration-200 select-none group relative ${getStatusStyles()}`}
+      className={`course-node-card relative h-[100px] w-[220px] select-none rounded-xl border py-0 shadow-xs ring-0 transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-sm ${CARD_STYLES[status]}`}
     >
       {/* Handles for React Flow connections */}
       <Handle
         type="target"
-        position={Position.Left}
+        position={isVertical ? Position.Top : Position.Left}
         className="!size-2.5 !rounded-full !border-2 !border-card !bg-muted-foreground/50 transition-colors hover:!bg-primary"
       />
 
-      <CardContent className="flex h-[96px] flex-col justify-between p-3.5">
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-1">
-            <span className="font-mono text-xs font-semibold tracking-wider text-foreground">
-              {course.code}
-            </span>
-            <span
-              className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${getBadgeStyles()}`}
-            >
-              {course.status}
-            </span>
-          </div>
-          <h4 className="text-xs font-medium leading-tight text-foreground line-clamp-2" title={course.title}>
-            {course.title}
-          </h4>
-        </div>
+      {/* Status accent edge (clipped to the rounded corner by overflow-hidden) */}
+      {isSet && (
+        <div
+          aria-hidden="true"
+          className={
+            isVertical
+              ? `absolute inset-x-0 top-0 h-[3px] ${EDGE_STYLES[status]}`
+              : `absolute inset-y-0 left-0 w-[3px] ${EDGE_STYLES[status]}`
+          }
+        />
+      )}
 
-        <div className="mt-2 flex items-center justify-between border-t border-border/60 pt-1.5">
-          <span className="text-[10px] font-medium text-muted-foreground">
-            {course.units} {course.units === 1 ? "Unit" : "Units"} • Y{course.year}T{course.term}
+      <CardContent className="flex h-full flex-col justify-between p-2.5">
+        <div className="flex h-5 items-center justify-between gap-1.5">
+          <span className="rounded-md border border-border/70 bg-muted px-1.5 py-px font-mono text-xs font-semibold tracking-wider text-foreground">
+            {course.code}
           </span>
 
-          {/* Action buttons (Appear on hover or active status) */}
-          <div className="flex items-center gap-1 opacity-80 transition-opacity group-hover:opacity-100">
-            {course.status === "passed" || course.status === "failed" || course.status === "blocked" ? (
+          {/* Grade stamp: current status icon; click resets to pending */}
+          {isSet ? (
+            <button
+              type="button"
+              onClick={handleReset}
+              title="Reset to pending"
+              aria-label={`Reset ${course.code} status to pending`}
+              className={`grid size-5 place-items-center rounded-full ring-1 ${ACTION_TRANSITION} active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${CHIP_STYLES[status]}`}
+            >
+              <StatusIcon className="size-3 stroke-[2.5]" aria-hidden="true" />
+            </button>
+          ) : (
+            <span className="grid size-5 place-items-center text-muted-foreground/50">
+              <Circle className="size-3" aria-hidden="true" />
+              <span className="sr-only">Pending</span>
+            </span>
+          )}
+        </div>
+
+        <h4
+          className="line-clamp-2 text-xs font-medium leading-snug text-foreground"
+          title={`${course.title}${
+            course.prerequisites.length > 0
+              ? ` — hard prereqs: ${course.prerequisites.join(", ")}`
+              : ""
+          }${
+            (course.softPrerequisites ?? []).length > 0
+              ? ` — soft prereqs: ${(course.softPrerequisites ?? []).join(", ")}`
+              : ""
+          }`}
+        >
+          {course.title}
+        </h4>
+
+        <div className="flex h-6 items-center justify-between">
+          <span className="text-[10px] font-medium text-muted-foreground">
+            {course.units} {course.units === 1 ? "Unit" : "Units"} •{" "}
+            <span className="font-mono tracking-wider">
+              Y{course.year}T{course.term}
+            </span>
+          </span>
+
+          {/* Action controls: quiet at rest, full presence on hover/focus */}
+          <div className="flex items-center gap-1 opacity-60 transition-opacity duration-200 focus-within:opacity-100 group-hover/card:opacity-100">
+            {isSet && (
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  updateCourseStatus(course.code, "pending");
-                }}
-                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={handleReset}
+                className={`grid size-6 place-items-center rounded-full bg-muted/70 text-muted-foreground ${ACTION_TRANSITION} hover:bg-muted hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
                 title="Reset Status"
                 aria-label={`Reset ${course.code} status to pending`}
               >
-                <RefreshCw className="size-3.5" />
+                <RefreshCw className="size-3" aria-hidden="true" />
               </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    updateCourseStatus(course.code, "passed");
-                  }}
-                  className="rounded-md p-1 text-status-passed transition-colors hover:bg-tint-passed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Mark Passed"
-                  aria-label={`Mark ${course.code} as passed`}
-                >
-                  <Check className="size-3.5 stroke-[2.5]" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    updateCourseStatus(course.code, "failed");
-                  }}
-                  className="rounded-md p-1 text-status-failed transition-colors hover:bg-tint-failed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Mark Failed"
-                  aria-label={`Mark ${course.code} as failed`}
-                >
-                  <X className="size-3.5 stroke-[2.5]" />
-                </button>
-              </>
             )}
+            <button
+              type="button"
+              onClick={handleSetStatus("passed")}
+              className={`grid size-6 place-items-center rounded-full bg-tint-passed text-status-passed ring-1 ring-status-passed/30 ${ACTION_TRANSITION} hover:bg-status-passed hover:text-background hover:ring-status-passed active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+              title="Mark Passed"
+              aria-label={`Mark ${course.code} as passed`}
+            >
+              <Check className="size-3.5 stroke-[2.5]" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={handleSetStatus("failed")}
+              className={`grid size-6 place-items-center rounded-full bg-tint-failed text-status-failed ring-1 ring-status-failed/30 ${ACTION_TRANSITION} hover:bg-status-failed hover:text-background hover:ring-status-failed active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+              title="Mark Failed"
+              aria-label={`Mark ${course.code} as failed`}
+            >
+              <X className="size-3.5 stroke-[2.5]" aria-hidden="true" />
+            </button>
           </div>
         </div>
       </CardContent>
 
       <Handle
         type="source"
-        position={Position.Right}
+        position={isVertical ? Position.Bottom : Position.Right}
         className="!size-2.5 !rounded-full !border-2 !border-card !bg-muted-foreground/50 transition-colors hover:!bg-primary"
       />
     </Card>

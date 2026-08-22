@@ -8,6 +8,7 @@ export interface Course {
   year: number;
   term: number;
   prerequisites: string[];
+  softPrerequisites?: string[];
   status: "pending" | "passed" | "failed" | "blocked";
 }
 
@@ -67,7 +68,7 @@ export function computeCourseStatuses(courses: Course[]): Course[] {
 export function getLayoutedElements(
   courses: Course[],
   edges: Edge[],
-  direction = "LR"
+  direction: "LR" | "TB" = "LR"
 ) {
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -75,20 +76,34 @@ export function getLayoutedElements(
   const nodeWidth = 220;
   const nodeHeight = 100;
 
-  // Configure dagre graph layout options
+  const isVertical = direction === "TB";
+
+  // Configure dagre graph layout options tailored to direction
   dagreGraph.setGraph({
     rankdir: direction,
-    ranksep: 80,
-    nodesep: 40,
+    ranksep: isVertical ? 80 : 90,
+    nodesep: isVertical ? 40 : 35,
+    marginx: 20,
+    marginy: 20,
+  });
+
+  // Sort courses by year and term so Dagre orders nodes logically within ranks
+  const sortedCourses = [...courses].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    if (a.term !== b.term) return a.term - b.term;
+    return a.code.localeCompare(b.code);
   });
 
   // Convert courses to React Flow Nodes
-  const nodes: Node[] = courses.map((course) => {
+  const nodes: Node[] = sortedCourses.map((course) => {
     return {
       id: course.code,
       type: "courseNode",
       data: { course },
       position: { x: 0, y: 0 }, // Dagre will calculate this
+      width: nodeWidth,
+      height: nodeHeight,
+      style: { width: nodeWidth, height: nodeHeight },
     };
   });
 
@@ -120,31 +135,103 @@ export function getLayoutedElements(
   return { nodes: layoutedNodes, edges };
 }
 
+export function getTermGridElements(courses: Course[], edges: Edge[]) {
+  const nodeWidth = 220;
+  const nodeHeight = 100;
+  const columnGap = 60;
+  const rowGap = 24;
+
+  const termOf = (course: Course) => ({
+    year: Math.max(1, Math.round(course.year) || 1),
+    term: Math.max(1, Math.round(course.term) || 1),
+  });
+
+  const terms = [
+    ...new Map(
+      courses.map((course) => {
+        const { year, term } = termOf(course);
+        return [`${year}:${term}`, { year, term }];
+      })
+    ).values(),
+  ].sort((a, b) => a.year - b.year || a.term - b.term);
+
+  const columnIndex = new Map(
+    terms.map(({ year, term }, index) => [`${year}:${term}`, index])
+  );
+
+  const perTerm = new Map<string, Course[]>();
+  [...courses]
+    .sort((a, b) => a.code.localeCompare(b.code))
+    .forEach((course) => {
+      const { year, term } = termOf(course);
+      const key = `${year}:${term}`;
+      const bucket = perTerm.get(key) || [];
+      bucket.push(course);
+      perTerm.set(key, bucket);
+    });
+
+  const nodes: Node[] = [];
+  perTerm.forEach((bucket, key) => {
+    const column = columnIndex.get(key) ?? terms.length - 1;
+    bucket.forEach((course, row) => {
+      nodes.push({
+        id: course.code,
+        type: "courseNode",
+        data: { course },
+        position: {
+          x: column * (nodeWidth + columnGap),
+          y: row * (nodeHeight + rowGap),
+        },
+        width: nodeWidth,
+        height: nodeHeight,
+        style: { width: nodeWidth, height: nodeHeight },
+      });
+    });
+  });
+
+  return { nodes, edges };
+}
+
 // Generate initial React Flow edges from course prerequisites
 export function generateEdgesFromPrereqs(courses: Course[]): Edge[] {
   const edges: Edge[] = [];
+  const courseCodes = new Set(courses.map((c) => c.code));
+
+  const edgeStyle = (course: Course): Edge["style"] => ({
+    stroke:
+      course.status === "passed"
+        ? "var(--edge-passed)"
+        : course.status === "blocked"
+        ? "var(--edge-blocked)"
+        : course.status === "failed"
+        ? "var(--edge-failed)"
+        : "var(--edge-pending)",
+    strokeWidth: 2,
+  });
+
   courses.forEach((course) => {
     course.prerequisites.forEach((prereq) => {
       // Find if prerequisite actually exists in curriculum
-      const prereqExists = courses.some((c) => c.code === prereq);
-      if (prereqExists) {
+      if (courseCodes.has(prereq)) {
         edges.push({
           id: `e-${prereq}-${course.code}`,
           source: prereq,
           target: course.code,
           type: "smoothstep",
           animated: course.status === "passed",
-          style: {
-            stroke:
-              course.status === "passed"
-                ? "var(--edge-passed)"
-                : course.status === "blocked"
-                ? "var(--edge-blocked)"
-                : course.status === "failed"
-                ? "var(--edge-failed)"
-                : "var(--edge-pending)",
-            strokeWidth: 2,
-          },
+          style: edgeStyle(course),
+        });
+      }
+    });
+    (course.softPrerequisites ?? []).forEach((prereq) => {
+      if (courseCodes.has(prereq) && !course.prerequisites.includes(prereq)) {
+        edges.push({
+          id: `e-soft-${prereq}-${course.code}`,
+          source: prereq,
+          target: course.code,
+          type: "smoothstep",
+          animated: false,
+          style: { ...edgeStyle(course), strokeDasharray: "6 3" },
         });
       }
     });

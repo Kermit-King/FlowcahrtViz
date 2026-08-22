@@ -75,13 +75,20 @@ export async function POST(req: NextRequest) {
           prerequisites: {
             type: "array",
             items: { type: "string" }
+          },
+          softPrerequisites: {
+            type: "array",
+            items: { type: "string" }
           }
         },
-        required: ["code", "title", "units", "year", "term", "prerequisites"]
+        required: ["code", "title", "units", "year", "term", "prerequisites", "softPrerequisites"]
       }
     };
 
     const extractionInstruction =
+      'Classify prerequisites: HARD prerequisites (must be PASSED before taking the course — usually drawn with solid lines/arrows) go in "prerequisites"; ' +
+      'SOFT prerequisites (must have been taken previously but need not be passed, failing still allows enrollment — usually drawn with dashed lines) go in "softPrerequisites"; ' +
+      "use an empty softPrerequisites array when the curriculum does not distinguish them. " +
       "Extract the curriculum data, but only the main courses, exclude general courses and elective subjects";
 
     const parts: Part[] = isImage
