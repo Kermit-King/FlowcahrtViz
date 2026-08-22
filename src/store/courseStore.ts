@@ -7,7 +7,6 @@ import {
   Connection,
   applyNodeChanges,
   applyEdgeChanges,
-  addEdge as reactFlowAddEdge,
 } from "reactflow";
 import {
   Course,
@@ -16,11 +15,15 @@ import {
   generateEdgesFromPrereqs,
 } from "@/lib/graphUtils";
 
+type LayoutDirection = "LR" | "TB";
+
 interface CourseState {
   courses: Course[];
   nodes: Node[];
   edges: Edge[];
+  layoutDirection: LayoutDirection;
   setCourses: (courses: Omit<Course, "status">[]) => void;
+  setLayoutDirection: (direction: LayoutDirection) => void;
   updateCourseStatus: (code: string, status: Course["status"]) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -32,6 +35,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
   courses: [],
   nodes: [],
   edges: [],
+  layoutDirection: "LR",
 
   setCourses: (rawCourses) => {
     // Add default status
@@ -42,12 +46,37 @@ export const useCourseStore = create<CourseState>((set, get) => ({
 
     const computedCourses = computeCourseStatuses(initialCourses);
     const initialEdges = generateEdgesFromPrereqs(computedCourses);
-    const { nodes, edges } = getLayoutedElements(computedCourses, initialEdges);
+    const { nodes, edges } = getLayoutedElements(
+      computedCourses,
+      initialEdges,
+      get().layoutDirection
+    );
 
     set({
       courses: computedCourses,
       nodes,
       edges,
+    });
+  },
+
+  setLayoutDirection: (direction) => {
+    set((state) => {
+      if (state.layoutDirection === direction) return {};
+
+      const computedCourses = computeCourseStatuses(state.courses);
+      const freshEdges = generateEdgesFromPrereqs(computedCourses);
+      const { nodes, edges } = getLayoutedElements(
+        computedCourses,
+        freshEdges,
+        direction
+      );
+
+      return {
+        layoutDirection: direction,
+        courses: computedCourses,
+        nodes,
+        edges,
+      };
     });
   },
 
@@ -86,12 +115,12 @@ export const useCourseStore = create<CourseState>((set, get) => ({
             style: {
               stroke:
                 targetCourse.status === "passed"
-                  ? "#22c55e"
+                  ? "var(--edge-passed)"
                   : targetCourse.status === "blocked"
-                  ? "#eab308"
+                  ? "var(--edge-blocked)"
                   : targetCourse.status === "failed"
-                  ? "#ef4444"
-                  : "#cbd5e1",
+                  ? "var(--edge-failed)"
+                  : "var(--edge-pending)",
               strokeWidth: 2,
             },
           };
@@ -115,8 +144,8 @@ export const useCourseStore = create<CourseState>((set, get) => ({
 
   onEdgesChange: (changes) => {
     set((state) => {
-      let updatedEdges = applyEdgeChanges(changes, state.edges);
-      let updatedCourses = [...state.courses];
+      const updatedEdges = applyEdgeChanges(changes, state.edges);
+      const updatedCourses = [...state.courses];
       let coursesChanged = false;
 
       // Detect edge removals
@@ -143,7 +172,11 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         const computedCourses = computeCourseStatuses(updatedCourses);
         // Regenerate edges to align with updated prerequisites
         const freshEdges = generateEdgesFromPrereqs(computedCourses);
-        const { nodes, edges } = getLayoutedElements(computedCourses, freshEdges);
+        const { nodes, edges } = getLayoutedElements(
+          computedCourses,
+          freshEdges,
+          state.layoutDirection
+        );
         return {
           courses: computedCourses,
           nodes,
@@ -183,7 +216,11 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       // 2. Re-compute statuses and layout
       const computedCourses = computeCourseStatuses(updatedCourses);
       const freshEdges = generateEdgesFromPrereqs(computedCourses);
-      const { nodes, edges } = getLayoutedElements(computedCourses, freshEdges);
+      const { nodes, edges } = getLayoutedElements(
+        computedCourses,
+        freshEdges,
+        state.layoutDirection
+      );
 
       return {
         courses: computedCourses,
@@ -214,7 +251,11 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       // 2. Recompute
       const computedCourses = computeCourseStatuses(updatedCourses);
       const freshEdges = generateEdgesFromPrereqs(computedCourses);
-      const { nodes, edges } = getLayoutedElements(computedCourses, freshEdges);
+      const { nodes, edges } = getLayoutedElements(
+        computedCourses,
+        freshEdges,
+        state.layoutDirection
+      );
 
       return {
         courses: computedCourses,

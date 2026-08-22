@@ -3,9 +3,11 @@
 import { useCourseStore } from "@/store/courseStore";
 import FileUpload from "@/components/FileUpload";
 import CurriculumFlow from "@/components/CurriculumFlow";
-import GWACalculator from "@/components/GWACalculator";
+import DashboardRail from "@/components/DashboardRail";
+import Mascot from "@/components/Mascot";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 export default function Home() {
   const courses = useCourseStore((state) => state.courses);
@@ -16,69 +18,63 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Premium Header */}
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <GraduationCap className="w-8 h-8 text-blue-600" />
-          <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-slate-900">
-              Degree Path Simulator
-            </h1>
-            <p className="text-xs text-slate-500 hidden sm:block">
-              Interactive Prerequisite Tree & Degree Progression Planner
-            </p>
-          </div>
-        </div>
-
-        {courses.length > 0 && (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleClearCurriculum}
-            className="flex items-center gap-1.5 text-xs"
-          >
-            <Trash2 className="w-4 h-4" />
-            Clear Curriculum
-          </Button>
-        )}
-      </header>
-
-      {/* Main Content Area */}
-      {courses.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-4xl mx-auto">
-          <div className="mb-6 max-w-2xl">
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight sm:text-4xl mb-3">
-              Upload Your University Curriculum
-            </h2>
-            <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-              Drop your official university curriculum PDF (e.g. computer science, engineering) here. 
-              Our Gemini parser will structure the courses, credits, semesters, and prerequisites into 
-              an interactive visual graph.
-            </p>
-          </div>
-          <div className="w-full">
-            <FileUpload onUploadComplete={(data) => setCourses(data.courses)} />
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-73px)]">
-          {/* GWA Calculator & Sidebar Info */}
-          <div className="lg:col-span-3 flex flex-col gap-6 overflow-y-auto">
-            <GWACalculator />
-
-            {/* Extra Info Box */}
-            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-xl p-5 shadow-md flex flex-col gap-2">
-              <h3 className="font-bold text-sm">💡 Quick Tips</h3>
-              <p className="text-xs text-blue-100 leading-relaxed">
-                You can drag nodes to rearrange them to your liking. Clicking "Reset Layout" will restore the automatic left-to-right DAG layout computed by Dagre.
+    <main className="flex min-h-dvh flex-col bg-background text-foreground">
+      {/* Header - solid paper background, whisper border, no glass */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Mascot size={36} className="shrink-0" />
+            <div className="min-w-0">
+              <p className="font-heading text-lg font-semibold leading-tight tracking-tight">
+                FlowchartViz
+              </p>
+              <p className="hidden text-xs text-muted-foreground sm:block">
+                Degree path simulator
               </p>
             </div>
           </div>
 
-          {/* Interactive React Flow Canvas */}
-          <div className="lg:col-span-9 h-full flex flex-col">
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            {courses.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearCurriculum}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 data-icon="inline-start" />
+                Clear curriculum
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {courses.length === 0 ? (
+        /* Empty state - Sprout beside the serif hero, above the dropzone */
+        <div className="flex flex-1 flex-col items-center justify-center px-4 py-16 text-center">
+          <div className="flex w-full max-w-2xl flex-col items-center">
+            <Mascot size={148} className="animate-rise" />
+            <h1 className="animate-rise stagger-1 mt-6 max-w-xl text-balance font-heading text-3xl font-medium leading-[1.15] tracking-tight sm:text-[2.75rem]">
+              Chart your degree, course by course.
+            </h1>
+            <p className="animate-rise stagger-2 mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Drop in your official curriculum PDF and FlowchartViz parses every
+              course, credit, and prerequisite into a living map. Then simulate
+              the grades that carry you to graduation.
+            </p>
+            <div className="animate-rise stagger-3 mt-10 w-full max-w-md">
+              <FileUpload onUploadComplete={(data) => setCourses(data.courses)} />
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Dashboard - full-bleed canvas with a floating simulator rail */
+        <div className="p-3 sm:p-4 lg:h-[calc(100dvh_-_4rem)] lg:overflow-hidden">
+          <div className="relative h-[70dvh] w-full lg:h-full">
             <CurriculumFlow />
+            <DashboardRail />
           </div>
         </div>
       )}

@@ -137,12 +137,12 @@ export function generateEdgesFromPrereqs(courses: Course[]): Edge[] {
           style: {
             stroke:
               course.status === "passed"
-                ? "#22c55e"
+                ? "var(--edge-passed)"
                 : course.status === "blocked"
-                ? "#eab308"
+                ? "var(--edge-blocked)"
                 : course.status === "failed"
-                ? "#ef4444"
-                : "#cbd5e1",
+                ? "var(--edge-failed)"
+                : "var(--edge-pending)",
             strokeWidth: 2,
           },
         });

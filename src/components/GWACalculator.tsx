@@ -1,9 +1,22 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useCourseStore } from "@/store/courseStore";
-import { Calculator, Award, CheckCircle, Percent } from "lucide-react";
+import {
+  Award,
+  Calculator,
+  CheckCircle,
+  PartyPopper,
+  Percent,
+  TriangleAlert,
+} from "lucide-react";
+
+const STATUS_MESSAGE_STYLES = {
+  error: "border-status-failed/30 bg-tint-failed text-status-failed",
+  warning: "border-status-blocked/30 bg-tint-blocked text-status-blocked",
+  success: "border-status-passed/30 bg-tint-passed text-status-passed",
+  info: "border-border bg-muted text-muted-foreground",
+} as const;
 
 export default function GWACalculator() {
   const courses = useCourseStore((state) => state.courses);
@@ -67,28 +80,28 @@ export default function GWACalculator() {
   }
 
   return (
-    <Card className="w-full shadow-lg border-slate-200">
-      <CardHeader className="pb-3 border-b border-slate-100">
-        <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800">
-          <Calculator className="w-5 h-5 text-blue-500" />
-          Progress & GWA Simulator
+    <Card className="w-full border border-border shadow-xs ring-0">
+      <CardHeader className="border-b border-border pb-3">
+        <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold tracking-tight">
+          <Calculator className="size-4 text-primary" />
+          Progress &amp; GWA Simulator
         </CardTitle>
       </CardHeader>
-      
-      <CardContent className="pt-4 flex flex-col gap-4">
+
+      <CardContent className="flex flex-col gap-4 pt-4">
         {/* Progress Grid */}
         <div className="grid grid-cols-2 gap-3 text-xs">
-          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-            <span className="text-slate-500 block mb-0.5">Completed Units</span>
-            <span className="text-lg font-bold text-slate-800 flex items-center gap-1">
-              <CheckCircle className="w-4 h-4 text-green-500" />
+          <div className="rounded-lg border border-border bg-muted p-2.5">
+            <span className="mb-0.5 block text-muted-foreground">Completed Units</span>
+            <span className="flex items-center gap-1 text-lg font-bold tabular-nums">
+              <CheckCircle className="size-4 text-status-passed" />
               {passedUnits} / {totalUnits}
             </span>
           </div>
-          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-            <span className="text-slate-500 block mb-0.5">Completion Rate</span>
-            <span className="text-lg font-bold text-slate-800 flex items-center gap-1">
-              <Percent className="w-4 h-4 text-blue-500" />
+          <div className="rounded-lg border border-border bg-muted p-2.5">
+            <span className="mb-0.5 block text-muted-foreground">Completion Rate</span>
+            <span className="flex items-center gap-1 text-lg font-bold tabular-nums">
+              <Percent className="size-4 text-primary" />
               {completionRate.toFixed(1)}%
             </span>
           </div>
@@ -96,25 +109,41 @@ export default function GWACalculator() {
 
         {/* Failed Courses indicator if any */}
         {failedUnits > 0 && (
-          <div className="text-xs bg-red-50 text-red-700 border border-red-100 p-2.5 rounded-lg">
-            ⚠️ You have <strong>{failedUnits} units</strong> of failed courses that you need to retake.
+          <div className="flex items-start gap-1.5 rounded-lg border border-status-failed/30 bg-tint-failed p-2.5 text-xs text-status-failed">
+            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              You have <strong>{failedUnits} units</strong> of failed courses
+              that you need to retake.
+            </span>
           </div>
         )}
 
         {/* GWA Scale Toggle */}
-        <div className="flex bg-slate-100 p-1 rounded-lg">
+        <div
+          role="group"
+          aria-label="Grading scale"
+          className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+        >
           <button
+            type="button"
             onClick={() => setScale("lower")}
-            className={`flex-1 text-center py-1 text-xs font-semibold rounded-md transition-all ${
-              scale === "lower" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"
+            aria-pressed={scale === "lower"}
+            className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              scale === "lower"
+                ? "bg-card text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             1.0 Scale (Lower is Better)
           </button>
           <button
+            type="button"
             onClick={() => setScale("higher")}
-            className={`flex-1 text-center py-1 text-xs font-semibold rounded-md transition-all ${
-              scale === "higher" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"
+            aria-pressed={scale === "higher"}
+            className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              scale === "higher"
+                ? "bg-card text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             4.0 Scale (Higher is Better)
@@ -124,10 +153,11 @@ export default function GWACalculator() {
         {/* Inputs */}
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-600">
+            <label htmlFor="current-average" className="text-xs font-medium text-muted-foreground">
               Current Average Grade (Completed Units)
             </label>
             <Input
+              id="current-average"
               type="number"
               step="0.01"
               value={currentAverage}
@@ -137,17 +167,18 @@ export default function GWACalculator() {
               disabled={passedUnits === 0}
             />
             {passedUnits === 0 && (
-              <span className="text-[10px] text-slate-400">
-                Mark some courses as "Passed" on the graph first.
+              <span className="text-[10px] text-muted-foreground">
+                Mark some courses as &quot;Passed&quot; on the graph first.
               </span>
             )}
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-600">
+            <label htmlFor="target-gwa" className="text-xs font-medium text-muted-foreground">
               Target Graduation GWA/GPA
             </label>
             <Input
+              id="target-gwa"
               type="number"
               step="0.01"
               value={targetGWA}
@@ -160,33 +191,28 @@ export default function GWACalculator() {
 
         {/* Calculation Result */}
         {passedUnits > 0 && remainingUnits > 0 ? (
-          <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
-            <div className="flex justify-between items-baseline">
-              <span className="text-xs text-slate-500 font-medium">Required Remaining Avg:</span>
-              <span className="text-lg font-extrabold text-blue-600">
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Required Remaining Avg:</span>
+              <span className="font-heading text-2xl font-semibold tabular-nums text-primary">
                 {requiredGWA !== null ? requiredGWA.toFixed(2) : "N/A"}
               </span>
             </div>
             <div
-              className={`text-xs p-2.5 rounded-lg border flex items-start gap-1.5 ${
-                statusType === "error"
-                  ? "bg-red-50 text-red-700 border-red-100"
-                  : statusType === "warning"
-                  ? "bg-amber-50 text-amber-700 border-amber-100"
-                  : "bg-green-50 text-green-700 border-green-100"
-              }`}
+              className={`flex items-start gap-1.5 rounded-lg border p-2.5 text-xs ${STATUS_MESSAGE_STYLES[statusType]}`}
             >
-              <Award className="w-4 h-4 shrink-0 mt-0.5" />
+              <Award className="mt-0.5 size-4 shrink-0" />
               <span>{statusMessage}</span>
             </div>
           </div>
         ) : remainingUnits === 0 && passedUnits > 0 ? (
-          <div className="border-t border-slate-100 pt-3 text-xs text-center text-green-600 font-semibold bg-green-50/50 p-3 rounded-lg border border-green-100">
-            🎉 Graduation complete! You achieved an average of {avg.toFixed(2)}.
+          <div className="flex items-center justify-center gap-1.5 rounded-lg border border-status-passed/30 bg-tint-passed p-3 text-center text-xs font-semibold text-status-passed">
+            <PartyPopper className="size-4 shrink-0" />
+            Graduation complete! You achieved an average of {avg.toFixed(2)}.
           </div>
         ) : (
-          <div className="border-t border-slate-100 pt-3 text-xs text-center text-slate-400">
-            Mark some courses as "Passed" on the graph to start simulating.
+          <div className="border-t border-border pt-3 text-center text-xs text-muted-foreground">
+            Mark some courses as &quot;Passed&quot; on the graph to start simulating.
           </div>
         )}
       </CardContent>
