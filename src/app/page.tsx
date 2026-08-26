@@ -25,18 +25,6 @@ export default function Home() {
       <header className="sticky top-0 z-40 border-b border-border bg-background">
         <div className="flex h-16 w-full items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
-            {courses.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setRailOpen(!railOpen)}
-                aria-label={railOpen ? "Close sidebar" : "Open sidebar"}
-                title={railOpen ? "Close sidebar" : "Open sidebar"}
-                className="mr-1 hidden sm:flex text-muted-foreground hover:text-foreground"
-              >
-                <PanelLeft className="size-4" />
-              </Button>
-            )}
             <Mascot size={36} className="shrink-0" />
             <div className="min-w-0">
               <p className="font-heading text-lg font-semibold leading-tight tracking-tight">

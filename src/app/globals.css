@@ -257,7 +257,8 @@
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--ring);
+  stroke: var(--ring) !important;
+  stroke-width: 3px !important;
 }
 
 .react-flow__attribution {
@@ -266,7 +267,8 @@
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--ring);
+  stroke: var(--ring) !important;
+  stroke-width: 3px !important;
 }
 
 .react-flow__attribution {
