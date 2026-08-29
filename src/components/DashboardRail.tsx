@@ -8,7 +8,6 @@ import {
   Calculator,
   ChevronDown,
   Lightbulb,
-  PanelLeft,
   PanelLeftClose,
   Search,
 } from "lucide-react";

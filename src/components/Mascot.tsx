@@ -23,15 +23,6 @@ export default function Mascot({
       aria-label="Sprout, the FlowchartViz mascot"
       className={className}
     >
-      {/* ground shadow */}
-      <ellipse
-        cx="70"
-        cy="126"
-        rx="28"
-        ry="5"
-        fillOpacity="0.1"
-        style={{ fill: "var(--mascot-ink)" }}
-      />
       {/* sprout stem and leaves rising from behind the cap */}
       <path
         d="M52 40 C50 30 46 24 41 19"

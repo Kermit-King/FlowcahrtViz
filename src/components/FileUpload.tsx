@@ -7,7 +7,23 @@ import { Button } from "@/components/ui/button";
 const ACCEPTED_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"];
 const FILE_TYPE_HINTS = ["PDF", "PNG", "JPG", "WebP", "HEIC"];
 
-  export default function FileUpload({ onUploadComplete }: { onUploadComplete: (data: { courses: Array<{ code: string; title: string; units: number; year: number; term: number; prerequisites: string[]; softPrerequisites?: string[] }> }) => void }) {
+export default function FileUpload({
+  onUploadComplete,
+  className,
+}: {
+  onUploadComplete: (data: {
+    courses: Array<{
+      code: string;
+      title: string;
+      units: number;
+      year: number;
+      term: number;
+      prerequisites: string[];
+      softPrerequisites?: string[];
+    }>;
+  }) => void;
+  className?: string;
+}) {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -90,7 +106,7 @@ const FILE_TYPE_HINTS = ["PDF", "PNG", "JPG", "WebP", "HEIC"];
   };
 
   return (
-    <div className="w-full rounded-xl border border-border bg-card p-4 shadow-xs sm:p-6">
+    <div className={`w-full flex flex-col gap-4 sm:gap-4.5 ${className || ""}`}>
       <div
         role="button"
         tabIndex={0}
@@ -100,12 +116,12 @@ const FILE_TYPE_HINTS = ["PDF", "PNG", "JPG", "WebP", "HEIC"];
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-10 ${
+        className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-7 sm:p-8 text-center outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
           isDragging
-            ? "border-primary bg-primary/5"
+            ? "border-primary bg-primary/10 scale-[0.99] shadow-inner"
             : file
-              ? "border-status-passed/60 bg-tint-passed/40"
-              : "border-input hover:border-primary/50 hover:bg-muted/50"
+              ? "border-status-passed/70 bg-tint-passed/50 shadow-sm"
+              : "border-border/80 bg-muted/30 hover:border-primary/60 hover:bg-muted/60 hover:shadow-sm"
         }`}
       >
         <input
@@ -119,72 +135,74 @@ const FILE_TYPE_HINTS = ["PDF", "PNG", "JPG", "WebP", "HEIC"];
         />
 
         {file ? (
-          <div className="flex flex-col items-center">
-            <span className="mb-3 flex size-12 items-center justify-center rounded-full bg-tint-passed text-status-passed">
-              <FileText className="size-6" />
+          <div className="flex flex-col items-center py-2">
+            <span className="mb-3 flex size-14 items-center justify-center rounded-2xl bg-tint-passed text-status-passed shadow-xs transition-transform group-hover:scale-105">
+              <FileText className="size-7" />
             </span>
-            <p className="max-w-[220px] truncate text-sm font-medium text-foreground" title={file.name}>
+            <p className="max-w-[300px] truncate text-sm sm:text-base font-semibold text-foreground" title={file.name}>
               {file.name}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground font-mono">
               {(file.size / 1024 / 1024).toFixed(2)} MB
             </p>
-            <p className="mt-3 text-xs text-muted-foreground">
+            <span className="mt-3 inline-flex items-center rounded-full bg-background/90 px-3 py-0.5 text-xs font-medium text-muted-foreground border border-border/70 shadow-2xs">
               Click or drop another file to replace
-            </p>
+            </span>
           </div>
         ) : (
-          <>
-            <span className="mb-4 flex size-12 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
-              <UploadCloud className="size-6" />
+          <div className="flex flex-col items-center py-2">
+            <span className="mb-3.5 flex size-14 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground shadow-xs transition-transform group-hover:scale-105 group-hover:bg-primary/15 group-hover:text-primary">
+              <UploadCloud className="size-7" />
             </span>
-            <h3 className="font-heading text-lg font-semibold tracking-tight">
-              Drop your curriculum
+            <h3 className="font-heading text-base sm:text-lg lg:text-xl font-semibold tracking-tight text-foreground">
+              Drop your curriculum file
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Drag &amp; drop your PDF or a photo of it here, or click to browse
+            <p className="mt-1.5 max-w-sm text-xs sm:text-sm text-muted-foreground leading-relaxed">
+              Drag &amp; drop your official PDF, syllabus, or photo here, or click to browse
             </p>
-          </>
+          </div>
         )}
       </div>
 
       {error && (
         <p
           role="alert"
-          className="mt-3 flex items-start gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive"
+          className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive animate-rise"
         >
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-          {error}
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          <span>{error}</span>
         </p>
       )}
 
-      <ul className="mt-3 flex flex-wrap items-center justify-center gap-1.5" aria-label="Accepted file types">
-        {FILE_TYPE_HINTS.map((hint) => (
-          <li
-            key={hint}
-            className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground"
-          >
-            {hint}
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-4">
-        <Button
-          onClick={handleUpload}
-          disabled={!file || isUploading}
-          className="w-full"
-        >
-          {isUploading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Parsing curriculum…
-            </>
-          ) : (
-            "Process curriculum"
-          )}
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+        <span className="font-medium text-xs">Accepted formats:</span>
+        <ul className="flex flex-wrap items-center gap-1.5" aria-label="Accepted file types">
+          {FILE_TYPE_HINTS.map((hint) => (
+            <li
+              key={hint}
+              className="rounded-md border border-border/70 bg-muted/60 px-2 py-0.5 text-[11px] font-medium tracking-wide text-muted-foreground"
+            >
+              {hint}
+            </li>
+          ))}
+        </ul>
       </div>
+
+      <Button
+        onClick={handleUpload}
+        disabled={!file || isUploading}
+        size="lg"
+        className="w-full h-11.5 text-sm sm:text-base font-semibold rounded-xl shadow-md transition-all hover:shadow-lg disabled:opacity-50"
+      >
+        {isUploading ? (
+          <>
+            <Loader2 className="mr-2 h-4.5 w-4.5 animate-spin" />
+            Parsing curriculum with AI…
+          </>
+        ) : (
+          "Process curriculum & generate map"
+        )}
+      </Button>
     </div>
   );
 }
