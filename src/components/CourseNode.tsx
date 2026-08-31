@@ -38,7 +38,7 @@ const STATUS_ICON: Record<CourseStatus, typeof Check> = {
 const ACTION_TRANSITION =
   "transition-[background-color,border-color,color,box-shadow,transform] duration-150";
 
-export default memo(function CourseNode({ data }: { data: { course: Course } }) {
+export default memo(function CourseNode({ data, selected }: { data: { course: Course }; selected?: boolean }) {
   const updateCourseStatus = useCourseStore((state) => state.updateCourseStatus);
   const layoutDirection = useCourseStore((state) => state.layoutDirection);
   const isVertical = layoutDirection === "TB";
@@ -61,7 +61,7 @@ export default memo(function CourseNode({ data }: { data: { course: Course } }) 
 
   return (
     <Card
-      className={`course-node-card relative h-[100px] w-[220px] select-none rounded-xl border py-0 shadow-xs ring-0 transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-sm ${CARD_STYLES[status]}`}
+      className={`course-node-card relative h-[100px] w-[220px] select-none rounded-xl border py-0 shadow-xs ring-0 transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-sm ${CARD_STYLES[status]} ${selected ? 'ring-2 ring-primary border-primary shadow-md' : ''}`}
     >
       {/* Handles for React Flow connections */}
       <Handle

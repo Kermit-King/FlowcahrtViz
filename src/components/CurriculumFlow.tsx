@@ -7,6 +7,7 @@ import ReactFlow, {
   BackgroundVariant,
   Node,
   ReactFlowProvider,
+  SelectionMode,
   useReactFlow,
   useStore,
 } from "reactflow";
@@ -249,6 +250,10 @@ function CurriculumCanvas() {
         fitView
         fitViewOptions={FIT_VIEW_OPTIONS}
         className="bg-transparent"
+        selectionOnDrag
+        panOnScroll
+        panOnDrag={false}
+        selectionMode={SelectionMode.Partial}
       >
         <Background
           variant={BackgroundVariant.Dots}

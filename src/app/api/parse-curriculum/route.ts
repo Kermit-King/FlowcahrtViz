@@ -6,6 +6,25 @@ import pdfParse from "pdf-parse/lib/pdf-parse.js";
 // In a real application, you'd use your actual API key
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "dummy_key" });
 
+const rateLimitMap = new Map<string, number[]>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 5;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const requests = rateLimitMap.get(ip) || [];
+  const recentRequests = requests.filter((time) => now - time < RATE_LIMIT_WINDOW);
+  
+  if (recentRequests.length >= MAX_REQUESTS_PER_WINDOW) {
+    rateLimitMap.set(ip, recentRequests); // Keep tracking but don't add the new one
+    return false;
+  }
+  
+  recentRequests.push(now);
+  rateLimitMap.set(ip, recentRequests);
+  return true;
+}
+
 function getErrorStatus(error: unknown): number | null {
   if (typeof error === "object" && error !== null && "status" in error) {
     const { status } = error as { status: unknown };
@@ -24,6 +43,14 @@ const SUPPORTED_IMAGE_TYPES = new Set([
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a minute before trying again." },
+        { status: 429 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
 

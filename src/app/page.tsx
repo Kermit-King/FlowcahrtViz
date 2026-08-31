@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useCourseStore } from "@/store/courseStore";
 import FileUpload from "@/components/FileUpload";
+import FlowchartLoading from "@/components/FlowchartLoading";
 import CurriculumFlow from "@/components/CurriculumFlow";
 import DashboardRail from "@/components/DashboardRail";
 import Mascot from "@/components/Mascot";
@@ -47,6 +48,7 @@ export default function Home() {
   const setCourses = useCourseStore((state) => state.setCourses);
   const [railOpen, setRailOpen] = useState(true);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleClearCurriculum = () => {
     setCourses([]);
@@ -106,7 +108,13 @@ export default function Home() {
         </div>
       </header>
 
-      {courses.length === 0 ? (
+      {isUploading ? (
+        <div className="flex flex-1 items-center justify-center p-6 w-full h-full min-h-[calc(100dvh-4rem)]">
+          <div className="w-full max-w-3xl flex flex-col items-center justify-center">
+            <FlowchartLoading />
+          </div>
+        </div>
+      ) : courses.length === 0 ? (
         /* Side-by-Side Split Card Empty State - Balanced & Fuller 100% Zoom */
         <div className="relative flex flex-1 items-center justify-center p-3 sm:p-5 md:p-6 lg:p-7 w-full max-w-5xl xl:max-w-[1240px] mx-auto min-h-0">
           {/* Main 2-Column Split Card */}
@@ -132,7 +140,14 @@ export default function Home() {
               </div>
 
               <div className="my-auto py-1">
-                <FileUpload onUploadComplete={(data) => setCourses(data.courses)} />
+                <FileUpload 
+                  onUploadStart={() => setIsUploading(true)}
+                  onUploadComplete={(data) => {
+                    setIsUploading(false);
+                    setCourses(data.courses);
+                  }} 
+                  onUploadError={() => setIsUploading(false)}
+                />
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs sm:text-sm text-muted-foreground pt-3.5 border-t border-border/60">
