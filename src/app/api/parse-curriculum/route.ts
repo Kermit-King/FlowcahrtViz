@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, type Part } from "@google/genai";
 // @ts-expect-error - bypassing buggy index.js in pdf-parse that causes ENOENT in webpack/turbopack
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import { filterAcademicCourses } from "@/lib/graphUtils";
 
 // In a real application, you'd use your actual API key
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "dummy_key" });
@@ -116,7 +117,13 @@ export async function POST(req: NextRequest) {
       'Classify prerequisites: HARD prerequisites (must be PASSED before taking the course — usually drawn with solid lines/arrows) go in "prerequisites"; ' +
       'SOFT prerequisites (must have been taken previously but need not be passed, failing still allows enrollment — usually drawn with dashed lines) go in "softPrerequisites"; ' +
       "use an empty softPrerequisites array when the curriculum does not distinguish them. " +
-      "Extract the curriculum data, but only the main courses, exclude general courses and elective subjects";
+      "EXCLUSION & INCLUSION RULES: " +
+      "1. EXCLUDE all General Education (GE) subjects (e.g. GEARTAP, GEPCOMM, GESTS, GEUSELF, GEETHIC, GERPHIS, GERISAL, GEMATMW, GEFT). " +
+      "2. EXCLUDE all Lasallian Formation & LC courses (e.g. LCFAITH, LCLWOST, LCONE, LCTWO, LCC, LASARE1, LASARE2, LASARE3). " +
+      "3. EXCLUDE all PE, NSTP, ROTC, and SAS courses (e.g. NSTP1, NSTP2, PATHFIT, PE1, PE2, SAS1000). " +
+      "4. MUST INCLUDE all Major & Core academic courses (e.g. CCPROG, CSARCH, CSNETWK, MTH101, etc.). " +
+      "5. MUST INCLUDE all Laboratory classes (courses with 'LBY' in code or title, e.g. LBYARCH, LBYCPRO, LBYNETW, LBYDB). " +
+      "6. MUST INCLUDE all Elective subjects (courses with 'ELEC' in code or title, e.g. CS ELEC 1, ST-ELEC1, FREE ELEC).";
 
     const parts: Part[] = isImage
       ? [
@@ -141,16 +148,17 @@ export async function POST(req: NextRequest) {
 
     const coursesText = response.text;
     const parsed = JSON.parse(coursesText || "[]");
-    const courses = Array.isArray(parsed) ? parsed : [];
+    const rawCourses = Array.isArray(parsed) ? parsed : [];
+    const courses = filterAcademicCourses(rawCourses);
 
     if (courses.length === 0) {
       return NextResponse.json(
         {
           error: isImage
-            ? "Gemini read the image but found no recognizable main courses. Try a clearer, higher-resolution photo that shows the full curriculum."
+            ? "Gemini read the image but found no recognizable major, lab, or elective courses. Try a clearer, higher-resolution photo that shows the full curriculum."
             : hasTextLayer
-            ? "Gemini returned an empty course list. The extracted PDF text may be garbled (broken font encoding) or contained no recognizable main courses. Try re-exporting the PDF with embedded text."
-            : "Gemini read the scanned pages but found no recognizable main courses. The scan quality may be too low — try a higher-resolution scan or re-export with OCR.",
+            ? "Gemini returned an empty course list. The extracted PDF text may be garbled or contained no recognizable major/lab/elective courses. Try re-exporting the PDF with embedded text."
+            : "Gemini read the scanned pages but found no recognizable major, lab, or elective courses. The scan quality may be too low — try a higher-resolution scan or re-export with OCR.",
         },
         { status: 422 }
       );

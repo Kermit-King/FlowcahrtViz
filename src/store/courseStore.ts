@@ -11,6 +11,7 @@ import {
 import {
   Course,
   computeCourseStatuses,
+  filterAcademicCourses,
   getLayoutedElements,
   getTermGridElements,
   generateEdgesFromPrereqs,
@@ -73,7 +74,8 @@ export const useCourseStore = create<CourseState>((set, get) => ({
   layoutMode: "flow",
 
   setCourses: (rawCourses) => {
-    const initialCourses: Course[] = rawCourses.map((c) => ({
+    const sanitizedRaw = filterAcademicCourses(rawCourses);
+    const initialCourses: Course[] = sanitizedRaw.map((c) => ({
       ...c,
       softPrerequisites: c.softPrerequisites ?? [],
       status: "pending",
@@ -152,19 +154,35 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       const computedCourses = computeCourseStatuses(updatedCourses);
 
       // 3. Update node data without resetting positions
-      const updatedNodes = state.nodes.map((node) => {
-        const foundCourse = computedCourses.find((c) => c.code === node.id);
-        if (foundCourse) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              course: foundCourse,
-            },
-          };
-        }
-        return node;
-      });
+      let updatedNodes: Node[];
+      if (state.layoutMode === "grid") {
+        // In grid/terms mode, regenerate nodes to refresh term header progress & year stats
+        // while preserving existing custom node positions if dragged
+        const freshLayout = getTermGridElements(computedCourses, state.edges);
+        const positionMap = new Map(state.nodes.map((n) => [n.id, n.position]));
+        updatedNodes = freshLayout.nodes.map((node) => {
+          const prevPos = positionMap.get(node.id);
+          // Preserve position for course nodes if user moved them
+          if (node.type === "courseNode" && prevPos) {
+            return { ...node, position: prevPos };
+          }
+          return node;
+        });
+      } else {
+        updatedNodes = state.nodes.map((node) => {
+          const foundCourse = computedCourses.find((c) => c.code === node.id);
+          if (foundCourse) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                course: foundCourse,
+              },
+            };
+          }
+          return node;
+        });
+      }
 
       // 4. Update edges styles based on new statuses
       const updatedEdges = state.edges.map((edge) => {

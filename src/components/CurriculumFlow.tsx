@@ -13,13 +13,26 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useCourseStore } from "@/store/courseStore";
-import { Course } from "@/lib/graphUtils";
+import { Course, getCurriculumStats } from "@/lib/graphUtils";
 import CourseNode from "./CourseNode";
+import TermHeaderNode from "./TermHeaderNode";
+import YearGroupNode from "./YearGroupNode";
+import TermBackdropNode from "./TermBackdropNode";
 import { Button } from "./ui/button";
-import { ArrowDown, ArrowRight, LayoutGrid, RotateCcw, Table, Workflow } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowRight,
+  Columns3,
+  LayoutGrid,
+  RotateCcw,
+  Workflow,
+} from "lucide-react";
 
 const nodeTypes = {
   courseNode: CourseNode,
+  termHeaderNode: TermHeaderNode,
+  yearGroupNode: YearGroupNode,
+  termBackdropNode: TermBackdropNode,
 };
 
 const FIT_VIEW_OPTIONS = { padding: 0.15, maxZoom: 1 } as const;
@@ -65,6 +78,7 @@ const LIGHT_CHART_COLORS: ChartColors = {
 };
 
 function statusOfNode(node: Node): CourseStatus {
+  if (node.type !== "courseNode") return "pending";
   const course = (node.data as { course?: Course } | undefined)?.course;
   if (
     course?.status === "passed" ||
@@ -163,6 +177,8 @@ function CurriculumCanvas() {
   const chartColors = useChartColors();
   const { fitView } = useReactFlow();
 
+  const stats = getCurriculumStats(courses);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -224,7 +240,7 @@ function CurriculumCanvas() {
   }, [courses, setCourses]);
 
   const handleResetLayout = useCallback(() => {
-    // Reset layout by running setCourses on current courses to run dagre algorithm
+    // Reset layout by running setCourses on current courses to run algorithm
     setCourses(courses);
   }, [courses, setCourses]);
 
@@ -238,7 +254,7 @@ function CurriculumCanvas() {
   return (
     <div
       ref={wrapperRef}
-      className="relative h-full w-full overflow-hidden rounded-xl border border-border bg-muted/40 shadow-xs"
+      className="relative h-full w-full overflow-hidden rounded-xl border border-border bg-muted/40 shadow-xs cursor-grab active:cursor-grabbing"
     >
       <ReactFlow
         nodes={nodes}
@@ -250,9 +266,11 @@ function CurriculumCanvas() {
         fitView
         fitViewOptions={FIT_VIEW_OPTIONS}
         className="bg-transparent"
-        selectionOnDrag
-        panOnScroll
-        panOnDrag={false}
+        panOnDrag={true}
+        selectionOnDrag={false}
+        panOnScroll={true}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
         selectionMode={SelectionMode.Partial}
       >
         <Background
@@ -282,6 +300,16 @@ function CurriculumCanvas() {
             aria-label="Canvas tools"
             className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-1.5 shadow-xs"
           >
+            {stats.totalTerms > 0 && (
+              <div className="hidden md:flex items-center gap-1.5 px-2 py-1 border-r border-border text-xs font-medium text-muted-foreground">
+                <span>{stats.totalYears} {stats.totalYears === 1 ? 'Year' : 'Years'}</span>
+                <span>•</span>
+                <span>{stats.totalTerms} Terms</span>
+                <span>•</span>
+                <span>{stats.totalUnits} Units</span>
+              </div>
+            )}
+
             <div
               role="group"
               aria-label="Arrangement"
@@ -291,23 +319,23 @@ function CurriculumCanvas() {
                 type="button"
                 onClick={() => setLayoutMode("flow")}
                 aria-pressed={layoutMode === "flow"}
-                title="Arrange by prerequisites (Dagre flow)"
+                title="Arrange by prerequisite dependencies (DAG flow)"
                 className={directionButtonClass(layoutMode === "flow")}
               >
                 <Workflow className="size-3.5" />
-                <span className="hidden sm:inline">Flow</span>
+                <span className="hidden sm:inline">By Prereq Flow</span>
                 <span className="sr-only sm:hidden">Prerequisite flow arrangement</span>
               </button>
               <button
                 type="button"
                 onClick={() => setLayoutMode("grid")}
                 aria-pressed={layoutMode === "grid"}
-                title="Arrange by term columns like the curriculum PDF"
+                title="Arrange by Year and Term flowchart columns"
                 className={directionButtonClass(layoutMode === "grid")}
               >
-                <Table className="size-3.5" />
-                <span className="hidden sm:inline">Terms</span>
-                <span className="sr-only sm:hidden">Term-column arrangement</span>
+                <Columns3 className="size-3.5" />
+                <span className="hidden sm:inline">By Terms</span>
+                <span className="sr-only sm:hidden">Year and Term column arrangement</span>
               </button>
             </div>
 
@@ -345,7 +373,7 @@ function CurriculumCanvas() {
               size="icon-sm"
               onClick={handleResetLayout}
               aria-label="Reset layout"
-              title="Reset layout"
+              title="Reset layout to default arrangement"
             >
               <LayoutGrid className="size-3.5" />
             </Button>
@@ -354,7 +382,7 @@ function CurriculumCanvas() {
               size="icon-sm"
               onClick={handleResetStatuses}
               aria-label="Reset statuses"
-              title="Reset statuses"
+              title="Reset all course statuses to pending"
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               <RotateCcw className="size-3.5" />

@@ -59,6 +59,10 @@ export default memo(function CourseNode({ data, selected }: { data: { course: Co
       updateCourseStatus(course.code, next);
     };
 
+    const isElective =
+    course.code.toLowerCase().includes("elec") ||
+    course.title.toLowerCase().includes("elec");
+
   return (
     <Card
       className={`course-node-card relative h-[100px] w-[220px] select-none rounded-xl border py-0 shadow-xs ring-0 transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-sm ${CARD_STYLES[status]} ${selected ? 'ring-2 ring-primary border-primary shadow-md' : ''}`}
@@ -84,9 +88,16 @@ export default memo(function CourseNode({ data, selected }: { data: { course: Co
 
       <CardContent className="flex h-full flex-col justify-between p-2.5">
         <div className="flex h-5 items-center justify-between gap-1.5">
-          <span className="rounded-md border border-border/70 bg-muted px-1.5 py-px font-mono text-xs font-semibold tracking-wider text-foreground">
-            {course.code}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-md border border-border/70 bg-muted px-1.5 py-px font-mono text-xs font-semibold tracking-wider text-foreground">
+              {course.code}
+            </span>
+            {isElective && (
+              <span className="rounded bg-primary/10 border border-primary/30 px-1 py-px text-[9px] font-semibold text-primary tracking-wide">
+                ELEC
+              </span>
+            )}
+          </div>
 
           {/* Grade stamp: current status icon; click resets to pending */}
           {isSet ? (
@@ -125,8 +136,8 @@ export default memo(function CourseNode({ data, selected }: { data: { course: Co
         <div className="flex h-6 items-center justify-between">
           <span className="text-[10px] font-medium text-muted-foreground">
             {course.units} {course.units === 1 ? "Unit" : "Units"} •{" "}
-            <span className="font-mono tracking-wider">
-              Y{course.year}T{course.term}
+            <span className="inline-flex items-center rounded bg-muted/80 px-1 py-px font-mono text-[9px] font-semibold text-foreground/85">
+              Y{course.year} · T{course.term}
             </span>
           </span>
 

@@ -195,14 +195,29 @@ export default function FileUpload({
             </ul>
           </div>
 
-          <Button
-            onClick={handleUpload}
-            disabled={!file}
-            size="lg"
-            className="w-full h-11.5 text-sm sm:text-base font-semibold rounded-xl shadow-md transition-all hover:shadow-lg disabled:opacity-50"
-          >
-            Process curriculum & generate map
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={handleUpload}
+              disabled={!file}
+              size="lg"
+              className="w-full h-11.5 text-sm sm:text-base font-semibold rounded-xl shadow-md transition-all hover:shadow-lg disabled:opacity-50"
+            >
+              Process curriculum & generate map
+            </Button>
+
+            <button
+              type="button"
+              onClick={() => {
+                import("@/lib/sampleCurriculum").then(({ SAMPLE_CURRICULUM }) => {
+                  onUploadComplete({ courses: SAMPLE_CURRICULUM });
+                });
+              }}
+              className="inline-flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors hover:underline"
+            >
+              <span>Or explore with sample 4-year degree flowchart</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
         </>
     </div>
   );
