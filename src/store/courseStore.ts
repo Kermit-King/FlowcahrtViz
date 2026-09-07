@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import {
   Node,
   Edge,
@@ -14,6 +15,7 @@ import {
   getLayoutedElements,
   getTermGridElements,
   generateEdgesFromPrereqs,
+  detectCycle,
 } from "@/lib/graphUtils";
 
 type LayoutDirection = "LR" | "TB";
@@ -55,22 +57,31 @@ interface CourseState {
   edges: Edge[];
   layoutDirection: LayoutDirection;
   layoutMode: LayoutMode;
+  selectedCourseId: string | null;
+  focusCourseId: string | null;
   setCourses: (courses: Omit<Course, "status">[]) => void;
   setLayoutDirection: (direction: LayoutDirection) => void;
   setLayoutMode: (mode: LayoutMode) => void;
   updateCourseStatus: (code: string, status: Course["status"]) => void;
+  updateCourseGrade: (code: string, grade?: number) => void;
+  setSelectedCourseId: (id: string | null) => void;
+  setFocusCourseId: (id: string | null) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
   deleteEdge: (edgeId: string) => void;
 }
 
-export const useCourseStore = create<CourseState>((set, get) => ({
-  courses: [],
-  nodes: [],
-  edges: [],
-  layoutDirection: "LR",
-  layoutMode: "flow",
+export const useCourseStore = create<CourseState>()(
+  persist(
+    (set, get) => ({
+      courses: [],
+      nodes: [],
+      edges: [],
+      layoutDirection: "LR",
+      layoutMode: "flow",
+      selectedCourseId: null,
+      focusCourseId: null,
 
   setCourses: (rawCourses) => {
     const initialCourses: Course[] = rawCourses.map((c) => ({
@@ -199,10 +210,42 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     });
   },
 
+  updateCourseGrade: (code, grade) => {
+    set((state) => {
+      const updatedCourses = state.courses.map((c) =>
+        c.code === code ? { ...c, grade } : c
+      );
+      const computedCourses = computeCourseStatuses(updatedCourses);
+      const updatedNodes = state.nodes.map((node) => {
+        const foundCourse = computedCourses.find((c) => c.code === node.id);
+        return foundCourse ? { ...node, data: { ...node.data, course: foundCourse } } : node;
+      });
+      return { courses: computedCourses, nodes: updatedNodes };
+    });
+  },
+
+  setSelectedCourseId: (id) => set({ selectedCourseId: id }),
+  setFocusCourseId: (id) => set({ focusCourseId: id }),
+
   onNodesChange: (changes) => {
-    set((state) => ({
-      nodes: applyNodeChanges(changes, state.nodes),
-    }));
+    set((state) => {
+      const updatedNodes = applyNodeChanges(changes, state.nodes);
+      let selectedId = state.selectedCourseId;
+      
+      const selectionChange = changes.find((c) => c.type === "select");
+      if (selectionChange && selectionChange.type === "select") {
+        if (selectionChange.selected) {
+          selectedId = selectionChange.id;
+        } else if (selectedId === selectionChange.id) {
+          selectedId = null;
+        }
+      }
+
+      return {
+        nodes: updatedNodes,
+        selectedCourseId: selectedId,
+      };
+    });
   },
 
   onEdgesChange: (changes) => {
@@ -263,6 +306,12 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       );
       if (exists) return {};
 
+      // Cycle detection
+      if (detectCycle(state.courses, source, target)) {
+        console.warn(`Connection from ${source} to ${target} creates a cycle and is ignored.`);
+        return {};
+      }
+
       // 1. Update target course's prerequisites list
       const updatedCourses = state.courses.map((c) => {
         if (c.code === target) {
@@ -321,4 +370,9 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       };
     });
   },
-}));
+}),
+{
+  name: "course-store",
+}
+)
+);

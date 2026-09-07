@@ -9,7 +9,8 @@ export interface Course {
   term: number;
   prerequisites: string[];
   softPrerequisites?: string[];
-  status: "pending" | "passed" | "failed" | "blocked";
+  status: "pending" | "passed" | "failed" | "blocked" | "eligible";
+  grade?: number;
 }
 
 // Compute the status of each course based on passed/failed inputs
@@ -60,6 +61,20 @@ export function computeCourseStatuses(courses: Course[]): Course[] {
       }
     });
   }
+
+  // Second pass: identify 'eligible' courses.
+  // A course is eligible if it is 'pending' and ALL of its hard prerequisites are 'passed'.
+  courseMap.forEach((course) => {
+    if (course.status === "pending") {
+      const allPassed = course.prerequisites.every((prereqCode) => {
+        const prereq = courseMap.get(prereqCode);
+        return prereq && prereq.status === "passed";
+      });
+      if (allPassed) {
+        course.status = "eligible";
+      }
+    }
+  });
 
   return Array.from(courseMap.values());
 }
@@ -237,4 +252,146 @@ export function generateEdgesFromPrereqs(courses: Course[]): Edge[] {
     });
   });
   return edges;
+}
+
+// Check if adding an edge from source -> target creates a cycle
+export function detectCycle(
+  courses: Course[],
+  source: string,
+  target: string
+): boolean {
+  const adjacencyList = new Map<string, string[]>();
+  courses.forEach((c) => {
+    adjacencyList.set(c.code, [...c.prerequisites]);
+  });
+  
+  // Temporarily add the new edge (target depends on source)
+  const targetPrereqs = adjacencyList.get(target) || [];
+  targetPrereqs.push(source);
+  adjacencyList.set(target, targetPrereqs);
+
+  const visited = new Set<string>();
+  const recStack = new Set<string>();
+
+  function dfs(node: string): boolean {
+    if (recStack.has(node)) return true;
+    if (visited.has(node)) return false;
+
+    visited.add(node);
+    recStack.add(node);
+
+    const prereqs = adjacencyList.get(node) || [];
+    for (const prereq of prereqs) {
+      if (dfs(prereq)) return true;
+    }
+
+    recStack.delete(node);
+    return false;
+  }
+
+  for (const course of courses) {
+    if (dfs(course.code)) return true;
+  }
+
+  return false;
+}
+
+export interface Gatekeeper {
+  code: string;
+  unlockedCount: number;
+  unlockedUnits: number;
+}
+
+export interface BottleneckAnalysis {
+  criticalPath: string[];
+  gatekeepers: Gatekeeper[];
+}
+
+export function analyzeBottlenecks(courses: Course[]): BottleneckAnalysis {
+  const adjacencyList = new Map<string, string[]>(); // node -> downstream nodes
+  const courseMap = new Map<string, Course>();
+
+  courses.forEach((c) => {
+    courseMap.set(c.code, c);
+    c.prerequisites.forEach((prereq) => {
+      const list = adjacencyList.get(prereq) || [];
+      list.push(c.code);
+      adjacencyList.set(prereq, list);
+    });
+  });
+
+  // Calculate critical path (longest path of prerequisites)
+  const memoLongestPath = new Map<string, string[]>();
+
+  function getLongestPath(node: string): string[] {
+    if (memoLongestPath.has(node)) return memoLongestPath.get(node)!;
+
+    const downstream = adjacencyList.get(node) || [];
+    let maxPath: string[] = [];
+
+    for (const next of downstream) {
+      const path = getLongestPath(next);
+      if (path.length > maxPath.length) {
+        maxPath = path;
+      }
+    }
+
+    const result = [node, ...maxPath];
+    memoLongestPath.set(node, result);
+    return result;
+  }
+
+  let criticalPath: string[] = [];
+  courses.forEach((c) => {
+    if (c.prerequisites.length === 0) {
+      const path = getLongestPath(c.code);
+      if (path.length > criticalPath.length) {
+        criticalPath = path;
+      }
+    }
+  });
+
+  // Calculate gatekeepers (number of downstream courses unlocked)
+  const gatekeepers: Gatekeeper[] = [];
+
+  function getReachableDownstream(startNode: string): Set<string> {
+    const reachable = new Set<string>();
+    const queue = [startNode];
+    while (queue.length > 0) {
+      const curr = queue.shift()!;
+      const downstream = adjacencyList.get(curr) || [];
+      for (const next of downstream) {
+        if (!reachable.has(next)) {
+          reachable.add(next);
+          queue.push(next);
+        }
+      }
+    }
+    return reachable;
+  }
+
+  courses.forEach((c) => {
+    const reachable = getReachableDownstream(c.code);
+    let unlockedUnits = 0;
+    reachable.forEach((code) => {
+      const course = courseMap.get(code);
+      if (course) unlockedUnits += course.units;
+    });
+
+    if (reachable.size > 0) {
+      gatekeepers.push({
+        code: c.code,
+        unlockedCount: reachable.size,
+        unlockedUnits,
+      });
+    }
+  });
+
+  // Sort gatekeepers by impact
+  gatekeepers.sort((a, b) => {
+    if (b.unlockedCount !== a.unlockedCount) return b.unlockedCount - a.unlockedCount;
+    return b.unlockedUnits - a.unlockedUnits;
+  });
+
+  return { criticalPath, gatekeepers };
 }

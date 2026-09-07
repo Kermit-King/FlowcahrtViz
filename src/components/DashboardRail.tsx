@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import GWACalculator from "@/components/GWACalculator";
 import { useCourseStore } from "@/store/courseStore";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,9 @@ import {
   Lightbulb,
   PanelLeftClose,
   Search,
+  Activity,
 } from "lucide-react";
+import { analyzeBottlenecks } from "@/lib/graphUtils";
 
 const kbdClass =
   "rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]";
@@ -25,15 +27,18 @@ export default function DashboardRail({
   onOpenChange,
 }: DashboardRailProps) {
   const [isDesktop, setIsDesktop] = useState(false);
-  const [activeTab, setActiveTab] = useState<"simulator" | "courses">("simulator");
+  const [activeTab, setActiveTab] = useState<"simulator" | "courses" | "analytics">("simulator");
   const [searchQuery, setSearchQuery] = useState("");
   const courses = useCourseStore((state) => state.courses);
   const updateCourseStatus = useCourseStore((state) => state.updateCourseStatus);
+  const setFocusCourseId = useCourseStore((state) => state.setFocusCourseId);
 
-  const filteredCourses = courses.filter((c) => 
+  const filteredCourses = useMemo(() => courses.filter((c) => 
     c.code.toLowerCase().includes(searchQuery.toLowerCase()) || 
     c.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ), [courses, searchQuery]);
+
+  const { criticalPath, gatekeepers } = useMemo(() => analyzeBottlenecks(courses), [courses]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 1024px)");
@@ -121,6 +126,12 @@ export default function DashboardRail({
             >
               Courses
             </button>
+            <button
+              onClick={() => setActiveTab("analytics")}
+              className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${activeTab === 'analytics' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Analytics
+            </button>
           </div>
         </div>
 
@@ -177,7 +188,7 @@ export default function DashboardRail({
                 </ul>
               </details>
             </>
-          ) : (
+          ) : activeTab === "courses" ? (
             <div className="flex flex-col gap-3">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
@@ -196,12 +207,12 @@ export default function DashboardRail({
                   </div>
                 ) : (
                   filteredCourses.map((course) => (
-                <div key={course.code} className="flex flex-col gap-2 p-3 rounded-lg border border-border bg-card">
+                <div key={course.code} className="flex flex-col gap-2 p-3 rounded-lg border border-border bg-card cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setFocusCourseId(course.code)}>
                   <div className="flex flex-col">
                     <span className="text-xs font-semibold">{course.code}</span>
                     <span className="text-xs text-muted-foreground line-clamp-1" title={course.title}>{course.title}</span>
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => updateCourseStatus(course.code, "passed")}
                       className={`flex-1 rounded py-1 text-[10px] font-medium border ${course.status === 'passed' ? 'bg-status-passed/20 border-status-passed text-status-passed' : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}
@@ -225,7 +236,40 @@ export default function DashboardRail({
               ))
             )}
             </div>
-          </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-sm font-semibold flex items-center gap-2"><Activity className="size-4 text-primary" /> Bottleneck Analyzer</h3>
+                <p className="text-xs text-muted-foreground">Identify courses that unlock the most downstream prerequisites.</p>
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Top Gatekeepers</h4>
+                <div className="flex flex-col gap-2">
+                  {gatekeepers.slice(0, 5).map((gk, idx) => (
+                    <div key={gk.code} className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-card cursor-pointer hover:border-primary/50" onClick={() => setFocusCourseId(gk.code)}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono font-semibold">{idx + 1}. {gk.code}</span>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Unlocks {gk.unlockedCount} ({gk.unlockedUnits}u)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-2">
+                <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Critical Path (Longest Chain)</h4>
+                <div className="flex flex-col gap-1 p-3 rounded-lg border border-border bg-muted/30">
+                  {criticalPath.map((code, idx) => (
+                    <div key={code} className="flex gap-2 text-xs" onClick={() => setFocusCourseId(code)}>
+                      <span className="text-muted-foreground">{idx + 1}.</span>
+                      <span className="font-mono font-semibold cursor-pointer hover:text-primary">{code}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </aside>

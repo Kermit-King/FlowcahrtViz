@@ -11,6 +11,7 @@ const CARD_STYLES: Record<CourseStatus, string> = {
   passed: "border-status-passed/60 bg-tint-passed/50",
   failed: "border-status-failed/60 bg-tint-failed/50",
   blocked: "border-dashed border-status-blocked/60 bg-tint-blocked/50",
+  eligible: "border-primary/50 bg-primary/5 shadow-xs hover:border-primary",
   pending: "border-border bg-card hover:border-primary/50",
 };
 
@@ -18,6 +19,7 @@ const EDGE_STYLES: Record<CourseStatus, string> = {
   passed: "bg-status-passed",
   failed: "bg-status-failed",
   blocked: "bg-status-blocked",
+  eligible: "bg-primary",
   pending: "",
 };
 
@@ -25,6 +27,7 @@ const CHIP_STYLES: Record<CourseStatus, string> = {
   passed: "bg-tint-passed text-status-passed ring-status-passed/30 hover:ring-status-passed/60",
   failed: "bg-tint-failed text-status-failed ring-status-failed/30 hover:ring-status-failed/60",
   blocked: "bg-tint-blocked text-status-blocked ring-status-blocked/30 hover:ring-status-blocked/60",
+  eligible: "bg-primary/10 text-primary ring-primary/30 hover:ring-primary/60",
   pending: "",
 };
 
@@ -32,19 +35,21 @@ const STATUS_ICON: Record<CourseStatus, typeof Check> = {
   passed: Check,
   failed: X,
   blocked: Ban,
+  eligible: Circle,
   pending: Circle,
 };
 
 const ACTION_TRANSITION =
   "transition-[background-color,border-color,color,box-shadow,transform] duration-150";
 
-export default memo(function CourseNode({ data, selected }: { data: { course: Course }; selected?: boolean }) {
+export default memo(function CourseNode({ data, selected }: { data: { course: Course; isDimmed?: boolean }; selected?: boolean }) {
   const updateCourseStatus = useCourseStore((state) => state.updateCourseStatus);
   const layoutDirection = useCourseStore((state) => state.layoutDirection);
   const isVertical = layoutDirection === "TB";
   const course = data.course;
   const status = course.status;
-  const isSet = status !== "pending";
+  const isSet = status !== "pending" && status !== "eligible";
+  const hasAccent = status !== "pending";
   const StatusIcon = STATUS_ICON[status];
 
   const handleReset = (e: { stopPropagation(): void }) => {
@@ -61,7 +66,7 @@ export default memo(function CourseNode({ data, selected }: { data: { course: Co
 
   return (
     <Card
-      className={`course-node-card relative h-[100px] w-[220px] select-none rounded-xl border py-0 shadow-xs ring-0 transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-sm ${CARD_STYLES[status]} ${selected ? 'ring-2 ring-primary border-primary shadow-md' : ''}`}
+      className={`course-node-card relative h-[100px] w-[220px] select-none rounded-xl border py-0 shadow-xs ring-0 transition-[background-color,border-color,box-shadow,transform,opacity,filter] duration-200 hover:-translate-y-px hover:shadow-sm ${CARD_STYLES[status]} ${selected ? 'ring-2 ring-primary border-primary shadow-md' : ''} ${data.isDimmed ? 'opacity-40 grayscale-[0.5]' : 'opacity-100'}`}
     >
       {/* Handles for React Flow connections */}
       <Handle
@@ -71,7 +76,7 @@ export default memo(function CourseNode({ data, selected }: { data: { course: Co
       />
 
       {/* Status accent edge (clipped to the rounded corner by overflow-hidden) */}
-      {isSet && (
+      {hasAccent && (
         <div
           aria-hidden="true"
           className={
@@ -89,15 +94,15 @@ export default memo(function CourseNode({ data, selected }: { data: { course: Co
           </span>
 
           {/* Grade stamp: current status icon; click resets to pending */}
-          {isSet ? (
+          {hasAccent ? (
             <button
               type="button"
-              onClick={handleReset}
-              title="Reset to pending"
-              aria-label={`Reset ${course.code} status to pending`}
-              className={`grid size-5 place-items-center rounded-full ring-1 ${ACTION_TRANSITION} active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${CHIP_STYLES[status]}`}
+              onClick={status === "eligible" ? undefined : handleReset}
+              title={status === "eligible" ? "Ready to take" : "Reset to pending"}
+              aria-label={status === "eligible" ? "Eligible" : `Reset ${course.code} status to pending`}
+              className={`grid size-5 place-items-center rounded-full ring-1 ${ACTION_TRANSITION} ${status !== "eligible" ? "active:scale-95 cursor-pointer hover:ring-2" : "cursor-default"} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${CHIP_STYLES[status]}`}
             >
-              <StatusIcon className="size-3 stroke-[2.5]" aria-hidden="true" />
+              <StatusIcon className={`size-3 ${status !== 'eligible' ? 'stroke-[2.5]' : 'stroke-2 fill-primary/20'}`} aria-hidden="true" />
             </button>
           ) : (
             <span className="grid size-5 place-items-center text-muted-foreground/50">

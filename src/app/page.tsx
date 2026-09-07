@@ -9,6 +9,7 @@ import DashboardRail from "@/components/DashboardRail";
 import Mascot from "@/components/Mascot";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
+import { openPrivacyPolicy } from "@/components/PrivacyPolicyModal";
 import {
   PanelLeft,
   Trash2,
@@ -21,6 +22,7 @@ import {
   CheckCircle2,
   ShieldCheck,
 } from "lucide-react";
+import { sampleCurriculum } from "@/lib/sampleCurriculum";
 
 const SHOWCASE_SLIDES = [
   {
@@ -80,6 +82,17 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={openPrivacyPolicy}
+              aria-label="Privacy & Terms of Use"
+              title="Privacy & Terms of Use"
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-2.5 h-8"
+            >
+              <ShieldCheck className="size-3.5 text-primary" />
+              <span className="hidden sm:inline">Privacy &amp; Terms</span>
+            </Button>
             {courses.length > 0 && (
               <Button
                 variant="ghost"
@@ -139,7 +152,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="my-auto py-1">
+              <div className="my-auto py-1 flex flex-col gap-4">
                 <FileUpload 
                   onUploadStart={() => setIsUploading(true)}
                   onUploadComplete={(data) => {
@@ -148,13 +161,33 @@ export default function Home() {
                   }} 
                   onUploadError={() => setIsUploading(false)}
                 />
+                
+                <div className="flex items-center gap-4">
+                  <div className="h-px flex-1 bg-border/60" />
+                  <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">OR</span>
+                  <div className="h-px flex-1 bg-border/60" />
+                </div>
+                
+                <Button 
+                  variant="outline" 
+                  onClick={() => setCourses(sampleCurriculum)}
+                  className="w-full h-[52px] rounded-xl border-dashed border-2 hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                >
+                  <Sparkles className="mr-2 size-4 text-primary" />
+                  Try a Sample Curriculum
+                </Button>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs sm:text-sm text-muted-foreground pt-3.5 border-t border-border/60">
-                <span className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={openPrivacyPolicy}
+                  className="group flex items-center gap-1.5 hover:text-foreground transition-colors cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  title="View Privacy Policy & Terms"
+                >
                   <ShieldCheck className="size-4 text-primary" />
-                  Fast, secure in-browser parsing
-                </span>
+                  <span>Fast, secure in-browser parsing</span>
+                </button>
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 className="size-4 text-status-passed" />
                   Instant degree simulation

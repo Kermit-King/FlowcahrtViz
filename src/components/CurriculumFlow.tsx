@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore, useMemo } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -16,7 +16,8 @@ import { useCourseStore } from "@/store/courseStore";
 import { Course } from "@/lib/graphUtils";
 import CourseNode from "./CourseNode";
 import { Button } from "./ui/button";
-import { ArrowDown, ArrowRight, LayoutGrid, RotateCcw, Table, Workflow } from "lucide-react";
+import { ArrowDown, ArrowRight, LayoutGrid, RotateCcw, Table, Workflow, Download, Code } from "lucide-react";
+import { toPng } from "html-to-image";
 
 const nodeTypes = {
   courseNode: CourseNode,
@@ -28,6 +29,7 @@ const STATUS_LEGEND = [
   { label: "Passed", dot: "bg-status-passed" },
   { label: "Failed", dot: "bg-status-failed" },
   { label: "Blocked", dot: "bg-status-blocked" },
+  { label: "Eligible", dot: "bg-primary" },
   { label: "Pending", dot: "bg-status-pending" },
 ] as const;
 
@@ -54,12 +56,14 @@ const LIGHT_CHART_COLORS: ChartColors = {
     passed: "oklch(0.5 0.11 152)",
     failed: "oklch(0.5 0.18 27)",
     blocked: "oklch(0.505 0.105 80)",
+    eligible: "oklch(0.458 0.085 155)",
     pending: "oklch(0.75 0.02 125)",
   },
   fill: {
     passed: "oklch(0.85 0.08 150)",
     failed: "oklch(0.85 0.08 25)",
     blocked: "oklch(0.86 0.08 90)",
+    eligible: "oklch(0.975 0.012 120)",
     pending: "oklch(0.86 0.015 125)",
   },
 };
@@ -88,12 +92,14 @@ function readChartColors(): ChartColors {
       passed: read("--status-passed") || LIGHT_CHART_COLORS.stroke.passed,
       failed: read("--status-failed") || LIGHT_CHART_COLORS.stroke.failed,
       blocked: read("--status-blocked") || LIGHT_CHART_COLORS.stroke.blocked,
+      eligible: read("--primary") || LIGHT_CHART_COLORS.stroke.eligible,
       pending: read("--minimap-node-stroke") || read("--border") || LIGHT_CHART_COLORS.stroke.pending,
     },
     fill: {
       passed: read("--status-passed") || LIGHT_CHART_COLORS.fill.passed,
       failed: read("--status-failed") || LIGHT_CHART_COLORS.fill.failed,
       blocked: read("--status-blocked") || LIGHT_CHART_COLORS.fill.blocked,
+      eligible: read("--primary-foreground") || LIGHT_CHART_COLORS.fill.eligible,
       pending: read("--minimap-node") || read("--muted") || LIGHT_CHART_COLORS.fill.pending,
     },
   };
@@ -155,13 +161,17 @@ function CurriculumCanvas() {
   const courses = useCourseStore((state) => state.courses);
   const setCourses = useCourseStore((state) => state.setCourses);
   const layoutDirection = useCourseStore((state) => state.layoutDirection);
-  const setLayoutDirection = useCourseStore(
-    (state) => state.setLayoutDirection
-  );
+  const setLayoutDirection = useCourseStore((state) => state.setLayoutDirection);
   const layoutMode = useCourseStore((state) => state.layoutMode);
   const setLayoutMode = useCourseStore((state) => state.setLayoutMode);
+  
+  const selectedCourseId = useCourseStore((state) => state.selectedCourseId);
+  const focusCourseId = useCourseStore((state) => state.focusCourseId);
+  const setFocusCourseId = useCourseStore((state) => state.setFocusCourseId);
+
   const chartColors = useChartColors();
-  const { fitView } = useReactFlow();
+  const { fitView, setCenter } = useReactFlow();
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -190,8 +200,6 @@ function CurriculumCanvas() {
     fitView(FIT_VIEW_OPTIONS);
   }, [layoutDirection, layoutMode, fitView]);
 
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
     const element = wrapperRef.current;
     if (!element) return;
@@ -214,8 +222,75 @@ function CurriculumCanvas() {
     };
   }, [fitView]);
 
+  // --- Focus Effect ---
+  useEffect(() => {
+    if (focusCourseId) {
+      const node = nodes.find(n => n.id === focusCourseId);
+      if (node) {
+        setCenter(node.position.x + 110, node.position.y + 50, { zoom: 1.1, duration: 800 });
+      }
+      setFocusCourseId(null);
+    }
+  }, [focusCourseId, nodes, setCenter, setFocusCourseId]);
+
+  // --- Prerequisite Highlighting ---
+  const highlightedNodeIds = useMemo(() => {
+    if (!selectedCourseId) return null;
+    const set = new Set<string>();
+    set.add(selectedCourseId);
+
+    const downstreamMap = new Map<string, string[]>();
+    const upstreamMap = new Map<string, string[]>();
+    courses.forEach(c => {
+      c.prerequisites.forEach(p => {
+        if (!downstreamMap.has(p)) downstreamMap.set(p, []);
+        downstreamMap.get(p)!.push(c.code);
+
+        if (!upstreamMap.has(c.code)) upstreamMap.set(c.code, []);
+        upstreamMap.get(c.code)!.push(p);
+      });
+    });
+
+    const upQueue = [selectedCourseId];
+    while (upQueue.length) {
+      const curr = upQueue.shift()!;
+      (upstreamMap.get(curr) || []).forEach(p => {
+        if (!set.has(p)) { set.add(p); upQueue.push(p); }
+      });
+    }
+
+    const downQueue = [selectedCourseId];
+    while (downQueue.length) {
+      const curr = downQueue.shift()!;
+      (downstreamMap.get(curr) || []).forEach(d => {
+        if (!set.has(d)) { set.add(d); downQueue.push(d); }
+      });
+    }
+
+    return set;
+  }, [selectedCourseId, courses]);
+
+  const displayNodes = useMemo(() => {
+    if (!highlightedNodeIds) return nodes;
+    return nodes.map(n => ({
+      ...n,
+      data: { ...n.data, isDimmed: !highlightedNodeIds.has(n.id) }
+    }));
+  }, [nodes, highlightedNodeIds]);
+
+  const displayEdges = useMemo(() => {
+    if (!highlightedNodeIds) return edges;
+    return edges.map(e => ({
+      ...e,
+      style: {
+        ...e.style,
+        opacity: highlightedNodeIds.has(e.source) && highlightedNodeIds.has(e.target) ? 1 : 0.15
+      }
+    }));
+  }, [edges, highlightedNodeIds]);
+
+  // --- Actions ---
   const handleResetStatuses = useCallback(() => {
-    // Reset all courses status to pending
     const resetCourses = courses.map((c) => ({
       ...c,
       status: "pending" as const,
@@ -224,9 +299,42 @@ function CurriculumCanvas() {
   }, [courses, setCourses]);
 
   const handleResetLayout = useCallback(() => {
-    // Reset layout by running setCourses on current courses to run dagre algorithm
     setCourses(courses);
   }, [courses, setCourses]);
+
+  const handleExportPNG = useCallback(() => {
+    if (!wrapperRef.current) return;
+    const flowElement = wrapperRef.current.querySelector(".react-flow") as HTMLElement;
+    if (!flowElement) return;
+
+    toPng(flowElement, {
+      backgroundColor: "var(--background)",
+      filter: (node) => {
+        if (node?.classList?.contains("react-flow__controls")) return false;
+        if (node?.classList?.contains("react-flow__panel")) return false;
+        if (node?.classList?.contains("react-flow__minimap")) return false;
+        return true;
+      },
+    }).then((dataUrl) => {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = "curriculum-flowchart.png";
+      a.click();
+    }).catch(err => {
+      console.error("Export PNG failed", err);
+    });
+  }, []);
+
+  const handleExportJSON = useCallback(() => {
+    const dataStr = JSON.stringify(courses, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "curriculum-backup.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [courses]);
 
   const directionButtonClass = (active: boolean) =>
     `flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
@@ -241,8 +349,8 @@ function CurriculumCanvas() {
       className="relative h-full w-full overflow-hidden rounded-xl border border-border bg-muted/40 shadow-xs"
     >
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={displayNodes}
+        edges={displayEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -337,6 +445,27 @@ function CurriculumCanvas() {
                 <span className="sr-only sm:hidden">Vertical layout</span>
               </button>
             </div>
+
+            <div className="h-5 w-px bg-border" aria-hidden="true" />
+
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleExportPNG}
+              aria-label="Export PNG"
+              title="Export as PNG Image"
+            >
+              <Download className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleExportJSON}
+              aria-label="Export JSON"
+              title="Export Curriculum JSON"
+            >
+              <Code className="size-3.5" />
+            </Button>
 
             <div className="h-5 w-px bg-border" aria-hidden="true" />
 

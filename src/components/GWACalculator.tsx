@@ -18,10 +18,24 @@ const STATUS_MESSAGE_STYLES = {
   info: "border-border bg-muted text-muted-foreground",
 } as const;
 
+const HONORS_THRESHOLDS = {
+  lower: [
+    { label: "Summa Cum Laude", max: 1.2 },
+    { label: "Magna Cum Laude", max: 1.45 },
+    { label: "Cum Laude", max: 1.75 },
+  ],
+  higher: [
+    { label: "Summa Cum Laude", min: 3.8 },
+    { label: "Magna Cum Laude", min: 3.5 },
+    { label: "Cum Laude", min: 3.2 },
+  ],
+};
+
 export default function GWACalculator() {
   const courses = useCourseStore((state) => state.courses);
+  const updateCourseGrade = useCourseStore((state) => state.updateCourseGrade);
 
-  const [currentAverage, setCurrentAverage] = useState<string>("2.0");
+  const [manualAverage, setManualAverage] = useState<string>("2.0");
   const [targetGWA, setTargetGWA] = useState<string>("1.75");
   const [scale, setScale] = useState<"lower" | "higher">("lower"); // lower is better (1.0 best, 3.0 pass) vs higher is better (4.0 best)
 
@@ -37,8 +51,18 @@ export default function GWACalculator() {
 
   const completionRate = totalUnits > 0 ? (passedUnits / totalUnits) * 100 : 0;
 
-  // Calculate required GWA/GPA
-  const avg = parseFloat(currentAverage) || 0;
+  // Calculate actual GWA based on individual grades
+  let totalGradeUnits = 0;
+  let gradedUnits = 0;
+  passedCourses.forEach((c) => {
+    if (c.grade !== undefined && c.grade > 0) {
+      totalGradeUnits += c.grade * c.units;
+      gradedUnits += c.units;
+    }
+  });
+  
+  const calculatedAvg = gradedUnits > 0 ? totalGradeUnits / gradedUnits : 0;
+  const avg = calculatedAvg > 0 ? calculatedAvg : (parseFloat(manualAverage) || 0);
   const target = parseFloat(targetGWA) || 0;
 
   let requiredGWA: number | null = null;
@@ -78,6 +102,17 @@ export default function GWACalculator() {
       }
     }
   }
+
+  const getHonorsLabel = (grade: number) => {
+    if (grade <= 0) return null;
+    if (scale === "lower") {
+      for (const t of HONORS_THRESHOLDS.lower) if (grade <= t.max) return t.label;
+    } else {
+      for (const t of HONORS_THRESHOLDS.higher) if (grade >= t.min) return t.label;
+    }
+    return null;
+  };
+  const currentHonors = getHonorsLabel(avg);
 
   return (
     <Card className="w-full border border-border shadow-xs ring-0">
@@ -152,24 +187,54 @@ export default function GWACalculator() {
 
         {/* Inputs */}
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="current-average" className="text-xs font-medium text-muted-foreground">
-              Current Average Grade (Completed Units)
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-medium text-muted-foreground flex justify-between">
+              <span>Current Average Grade</span>
+              {calculatedAvg > 0 && <span className="text-primary font-mono">{calculatedAvg.toFixed(3)}</span>}
             </label>
-            <Input
-              id="current-average"
-              type="number"
-              step="0.01"
-              value={currentAverage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentAverage(e.target.value)}
-              placeholder="e.g. 2.0 or 3.5"
-              className="h-9 text-sm"
-              disabled={passedUnits === 0}
-            />
-            {passedUnits === 0 && (
-              <span className="text-[10px] text-muted-foreground">
-                Mark some courses as &quot;Passed&quot; on the graph first.
-              </span>
+            
+            {passedCourses.length > 0 ? (
+              <details className="group rounded-md border border-border bg-card shadow-xs [&_summary::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer items-center justify-between p-2 text-xs font-medium outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                  <span>Enter per-course grades ({gradedUnits}/{passedUnits} units graded)</span>
+                  <span className="text-[10px] text-muted-foreground group-open:hidden">Expand to enter</span>
+                </summary>
+                <div className="flex max-h-48 flex-col gap-2 overflow-y-auto border-t border-border p-2">
+                  {passedCourses.map((c) => (
+                    <div key={c.code} className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono w-20 truncate" title={c.title}>{c.code}</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Grade"
+                        value={c.grade || ""}
+                        onChange={(e) => updateCourseGrade(c.code, parseFloat(e.target.value) || undefined)}
+                        className="h-6 w-20 px-2 text-[10px]"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+
+            {calculatedAvg === 0 && (
+              <>
+                <Input
+                  id="current-average"
+                  type="number"
+                  step="0.01"
+                  value={manualAverage}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualAverage(e.target.value)}
+                  placeholder="Or enter overall average"
+                  className="h-8 text-xs"
+                  disabled={passedUnits === 0}
+                />
+                {passedUnits === 0 && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Mark some courses as &quot;Passed&quot; on the graph first.
+                  </span>
+                )}
+              </>
             )}
           </div>
 
@@ -198,17 +263,31 @@ export default function GWACalculator() {
                 {requiredGWA !== null ? requiredGWA.toFixed(2) : "N/A"}
               </span>
             </div>
+            {currentHonors && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 p-2 text-xs text-primary">
+                <Award className="size-3.5" />
+                <span>On track for <strong>{currentHonors}</strong></span>
+              </div>
+            )}
             <div
               className={`flex items-start gap-1.5 rounded-lg border p-2.5 text-xs ${STATUS_MESSAGE_STYLES[statusType]}`}
             >
-              <Award className="mt-0.5 size-4 shrink-0" />
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
               <span>{statusMessage}</span>
             </div>
           </div>
         ) : remainingUnits === 0 && passedUnits > 0 ? (
-          <div className="flex items-center justify-center gap-1.5 rounded-lg border border-status-passed/30 bg-tint-passed p-3 text-center text-xs font-semibold text-status-passed">
-            <PartyPopper className="size-4 shrink-0" />
-            Graduation complete! You achieved an average of {avg.toFixed(2)}.
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-center gap-1.5 rounded-lg border border-status-passed/30 bg-tint-passed p-3 text-center text-xs font-semibold text-status-passed">
+              <PartyPopper className="size-4 shrink-0" />
+              Graduation complete! Final GWA: {avg.toFixed(2)}.
+            </div>
+            {currentHonors && (
+              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 p-2 text-xs text-primary font-semibold">
+                <Award className="size-4" />
+                {currentHonors}
+              </div>
+            )}
           </div>
         ) : (
           <div className="border-t border-border pt-3 text-center text-xs text-muted-foreground">
