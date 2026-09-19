@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   title: "FlowchartViz — Degree Path Simulator",
   description:
     "Upload a curriculum PDF and chart every course, prerequisite, and semester into an interactive degree path. Simulate grades and track your progress to graduation.",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export const viewport: Viewport = {

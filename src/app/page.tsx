@@ -209,10 +209,10 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Center Mascot & Feature Pills */}
+                {/* Center Logo & Feature Pills */}
                 <div className="my-6 flex flex-col items-center justify-center relative z-10">
                   <div className="relative flex items-center justify-center p-2">
-                    <Mascot size={150} className="relative z-10 transition-transform duration-300 hover:scale-105" />
+                    <Mascot size={130} className="relative z-10 transition-transform duration-300 hover:scale-105" />
                   </div>
 
                   {/* Feature Pills */}

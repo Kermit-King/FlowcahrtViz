@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="fv-badge-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="88" height="88" rx="24" ry="24" fill="url(#fv-badge-grad)" />
+  <path d="M 26 50 C 38 50, 38 28, 50 28 C 62 28, 62 50, 74 50" fill="none" stroke="#ffffff" stroke-width="6.5" stroke-linecap="round" />
+  <path d="M 26 50 C 38 50, 38 72, 50 72 C 62 72, 62 50, 74 50" fill="none" stroke="#ffffff" stroke-width="6.5" stroke-linecap="round" />
+  <circle cx="26" cy="50" r="7" fill="#ffffff" />
+  <circle cx="26" cy="50" r="3.2" fill="#059669" />
+  <circle cx="50" cy="28" r="7" fill="#ffffff" />
+  <circle cx="50" cy="28" r="3.2" fill="#059669" />
+  <circle cx="50" cy="72" r="7" fill="#ffffff" />
+  <circle cx="50" cy="72" r="3.2" fill="#059669" />
+  <circle cx="74" cy="50" r="8.5" fill="#ffffff" />
+  <circle cx="74" cy="50" r="3.8" fill="#047857" />
+</svg>
