@@ -61,6 +61,10 @@ interface CourseState {
   focusCourseId: string | null;
   courseModalOpen: boolean;
   courseToEdit: Course | null;
+  tourOpen: boolean;
+  hasSeenTour: boolean;
+  openTour: () => void;
+  closeTour: () => void;
   setCourses: (courses: Omit<Course, "status">[]) => void;
   setLayoutDirection: (direction: LayoutDirection) => void;
   setLayoutMode: (mode: LayoutMode) => void;
@@ -92,7 +96,11 @@ export const useCourseStore = create<CourseState>()(
       focusCourseId: null,
       courseModalOpen: false,
       courseToEdit: null,
+      tourOpen: false,
+      hasSeenTour: false,
 
+      openTour: () => set({ tourOpen: true }),
+      closeTour: () => set({ tourOpen: false, hasSeenTour: true }),
       openAddCourseModal: () => set({ courseModalOpen: true, courseToEdit: null }),
       openEditCourseModal: (course) => set({ courseModalOpen: true, courseToEdit: course }),
       closeCourseModal: () => set({ courseModalOpen: false, courseToEdit: null }),
@@ -113,10 +121,13 @@ export const useCourseStore = create<CourseState>()(
       get().layoutDirection
     );
 
+    const shouldOpenTour = !get().hasSeenTour && rawCourses.length > 0;
+
     set({
       courses: computedCourses,
       nodes,
       edges,
+      tourOpen: shouldOpenTour ? true : get().tourOpen,
     });
   },
 

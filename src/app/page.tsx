@@ -8,6 +8,7 @@ import CurriculumFlow from "@/components/CurriculumFlow";
 import DashboardRail from "@/components/DashboardRail";
 import Mascot from "@/components/Mascot";
 import CourseFormModal from "@/components/CourseFormModal";
+import OnboardingTour from "@/components/OnboardingTour";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { openPrivacyPolicy } from "@/components/PrivacyPolicyModal";
@@ -24,6 +25,7 @@ import {
   ShieldCheck,
   Plus,
   PenTool,
+  HelpCircle,
 } from "lucide-react";
 import { sampleCurriculum } from "@/lib/sampleCurriculum";
 
@@ -52,6 +54,7 @@ export default function Home() {
   const courses = useCourseStore((state) => state.courses);
   const setCourses = useCourseStore((state) => state.setCourses);
   const openAddCourseModal = useCourseStore((state) => state.openAddCourseModal);
+  const openTour = useCourseStore((state) => state.openTour);
   const [railOpen, setRailOpen] = useState(true);
   const [activeSlide, setActiveSlide] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
@@ -97,6 +100,17 @@ export default function Home() {
                 <span className="hidden sm:inline">Add Course</span>
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={openTour}
+              aria-label="Interactive Tutorial & Guide"
+              title="Interactive Tutorial & Guide"
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-2.5 h-8"
+            >
+              <HelpCircle className="size-3.5 text-primary" />
+              <span className="hidden sm:inline">Guide</span>
+            </Button>
             <Button
               variant="ghost"
               size="sm"

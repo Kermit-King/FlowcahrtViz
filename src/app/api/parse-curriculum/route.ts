@@ -130,17 +130,69 @@ export async function POST(req: NextRequest) {
           { text: `${extractionInstruction} from this scanned (image-based) curriculum PDF, reading it via OCR, and return a JSON array of courses.` },
         ];
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: parts,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      }
-    });
+    // Candidate models in fallback order
+    // gemini-2.5/2.0/1.5 are retired (404 for new API keys); use current generations.
+    // "-latest" aliases auto-track the newest flash model so they never 404 from retirement.
+    const CANDIDATE_MODELS = [
+      "gemini-3.6-flash",
+      "gemini-3.7-flash",
+      "gemini-flash-latest",
+      "gemini-flash-lite-latest",
+      "gemini-3.1-pro-preview",
+    ];
+    const MAX_ATTEMPTS_PER_MODEL = 3;
 
-    const coursesText = response.text;
-    const parsed = JSON.parse(coursesText || "[]");
+    let lastError: unknown = null;
+    let responseText: string | null = null;
+
+    for (const model of CANDIDATE_MODELS) {
+      for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_MODEL; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: parts,
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: schema,
+            },
+          });
+          if (response.text) {
+            responseText = response.text;
+            break;
+          }
+        } catch (err: unknown) {
+          lastError = err;
+          const status = getErrorStatus(err);
+          console.warn(`[parse-curriculum] Attempt ${attempt + 1} with model '${model}' failed (status: ${status}):`, err instanceof Error ? err.message : err);
+
+          // 429 is quota-based with a ~60s window, so an in-request retry can never
+          // clear it — retrying here only hangs the upload. Switch models or fail fast
+          // to the friendly "quota reached" error below.
+          if (status === 429) {
+            break;
+          }
+
+          // 5xx is transient capacity (e.g. "high demand"): retry this model patiently
+          if (status === 503 || status === 500 || status === 504) {
+            await new Promise((resolve) => setTimeout(resolve, 1200 * (attempt + 1)));
+            continue;
+          }
+
+          // Anything else (400/403/404...): move to the next candidate model
+          break;
+        }
+      }
+
+      if (responseText) {
+        break;
+      }
+    }
+
+    if (!responseText) {
+      throw lastError || new Error("Unable to parse curriculum with available Gemini models.");
+    }
+
+    const parsed = JSON.parse(responseText || "[]");
     const courses = Array.isArray(parsed) ? parsed : [];
 
     if (courses.length === 0) {
@@ -160,11 +212,23 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     console.error("Error parsing curriculum:", error);
 
-    if (getErrorStatus(error) === 429) {
+    const status = getErrorStatus(error);
+
+    if (status === 503) {
       return NextResponse.json(
         {
           error:
-            "Gemini API quota exceeded. The free tier allows 20 requests/day for this model — it resets daily (midnight Pacific time). Try again after the reset, or enable billing on your Google AI project.",
+            "Google AI (Gemini) servers are currently experiencing high demand. Please try again in a few moments, or click 'Build Flowchart Manually' to start building immediately without waiting!",
+        },
+        { status: 503 }
+      );
+    }
+
+    if (status === 429) {
+      return NextResponse.json(
+        {
+          error:
+            "Gemini API quota reached. Please wait a minute and try again, or use 'Build Flowchart Manually' to create courses directly.",
         },
         { status: 429 }
       );

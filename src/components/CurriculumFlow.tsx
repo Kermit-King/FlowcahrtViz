@@ -16,13 +16,16 @@ import { useCourseStore } from "@/store/courseStore";
 import { Course } from "@/lib/graphUtils";
 import CourseNode from "./CourseNode";
 import CourseFormModal from "./CourseFormModal";
+import OnboardingTour from "./OnboardingTour";
 import { Button } from "./ui/button";
-import { ArrowDown, ArrowRight, LayoutGrid, RotateCcw, Table, Workflow, Download, Code, Plus, Upload } from "lucide-react";
+import { ArrowDown, ArrowRight, LayoutGrid, RotateCcw, Table, Workflow, Download, Code, Plus, Upload, HelpCircle } from "lucide-react";
 import { toPng } from "html-to-image";
 
-const nodeTypes = {
+const NODE_TYPES = {
   courseNode: CourseNode,
 };
+
+const EDGE_TYPES = {};
 
 const FIT_VIEW_OPTIONS = { padding: 0.15, maxZoom: 1 } as const;
 
@@ -170,6 +173,7 @@ function CurriculumCanvas() {
   const focusCourseId = useCourseStore((state) => state.focusCourseId);
   const setFocusCourseId = useCourseStore((state) => state.setFocusCourseId);
   const openAddCourseModal = useCourseStore((state) => state.openAddCourseModal);
+  const openTour = useCourseStore((state) => state.openTour);
 
   const chartColors = useChartColors();
   const { fitView, setCenter } = useReactFlow();
@@ -384,7 +388,8 @@ function CurriculumCanvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        nodeTypes={nodeTypes}
+        nodeTypes={NODE_TYPES}
+        edgeTypes={EDGE_TYPES}
         fitView
         fitViewOptions={FIT_VIEW_OPTIONS}
         className="bg-transparent"
@@ -553,6 +558,20 @@ function CurriculumCanvas() {
             >
               <RotateCcw className="size-3.5" />
             </Button>
+
+            <div className="h-5 w-px bg-border" aria-hidden="true" />
+
+            {/* Interactive Tour & Guide */}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={openTour}
+              aria-label="Interactive Guide & Tutorial"
+              title="Interactive Guide & Tutorial"
+              className="text-primary hover:bg-primary/10"
+            >
+              <HelpCircle className="size-3.5" />
+            </Button>
           </div>
         </Panel>
 
@@ -602,6 +621,7 @@ export default function CurriculumFlow() {
     <ReactFlowProvider>
       <CurriculumCanvas />
       <CourseFormModal />
+      <OnboardingTour />
     </ReactFlowProvider>
   );
 }
