@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position } from "reactflow";
-import { Ban, Check, Circle, RefreshCw, X } from "lucide-react";
+import { Ban, Check, Circle, Edit2, RefreshCw, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCourseStore } from "@/store/courseStore";
 import { Course } from "@/lib/graphUtils";
@@ -44,6 +44,7 @@ const ACTION_TRANSITION =
 
 export default memo(function CourseNode({ data, selected }: { data: { course: Course; isDimmed?: boolean }; selected?: boolean }) {
   const updateCourseStatus = useCourseStore((state) => state.updateCourseStatus);
+  const openEditCourseModal = useCourseStore((state) => state.openEditCourseModal);
   const layoutDirection = useCourseStore((state) => state.layoutDirection);
   const isVertical = layoutDirection === "TB";
   const course = data.course;
@@ -51,6 +52,11 @@ export default memo(function CourseNode({ data, selected }: { data: { course: Co
   const isSet = status !== "pending" && status !== "eligible";
   const hasAccent = status !== "pending";
   const StatusIcon = STATUS_ICON[status];
+
+  const handleEdit = (e: { stopPropagation(): void }) => {
+    e.stopPropagation();
+    openEditCourseModal(course);
+  };
 
   const handleReset = (e: { stopPropagation(): void }) => {
     e.stopPropagation();
@@ -66,7 +72,7 @@ export default memo(function CourseNode({ data, selected }: { data: { course: Co
 
   return (
     <Card
-      className={`course-node-card relative h-[100px] w-[220px] select-none rounded-xl border py-0 shadow-xs ring-0 transition-[background-color,border-color,box-shadow,transform,opacity,filter] duration-200 hover:-translate-y-px hover:shadow-sm ${CARD_STYLES[status]} ${selected ? 'ring-2 ring-primary border-primary shadow-md' : ''} ${data.isDimmed ? 'opacity-40 grayscale-[0.5]' : 'opacity-100'}`}
+      className={`course-node-card group/card relative h-[100px] w-[220px] select-none rounded-xl border py-0 shadow-xs ring-0 transition-[background-color,border-color,box-shadow,transform,opacity,filter] duration-200 hover:-translate-y-px hover:shadow-sm ${CARD_STYLES[status]} ${selected ? 'ring-2 ring-primary border-primary shadow-md' : ''} ${data.isDimmed ? 'opacity-40 grayscale-[0.5]' : 'opacity-100'}`}
     >
       {/* Handles for React Flow connections */}
       <Handle
@@ -89,9 +95,20 @@ export default memo(function CourseNode({ data, selected }: { data: { course: Co
 
       <CardContent className="flex h-full flex-col justify-between p-2.5">
         <div className="flex h-5 items-center justify-between gap-1.5">
-          <span className="rounded-md border border-border/70 bg-muted px-1.5 py-px font-mono text-xs font-semibold tracking-wider text-foreground">
-            {course.code}
-          </span>
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="rounded-md border border-border/70 bg-muted px-1.5 py-px font-mono text-xs font-semibold tracking-wider text-foreground">
+              {course.code}
+            </span>
+            <button
+              type="button"
+              onClick={handleEdit}
+              title={`Edit ${course.code}`}
+              aria-label={`Edit ${course.code}`}
+              className="opacity-0 group-hover/card:opacity-80 hover:!opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <Edit2 className="size-3" />
+            </button>
+          </div>
 
           {/* Grade stamp: current status icon; click resets to pending */}
           {hasAccent ? (

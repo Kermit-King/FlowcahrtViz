@@ -15,8 +15,9 @@ import "reactflow/dist/style.css";
 import { useCourseStore } from "@/store/courseStore";
 import { Course } from "@/lib/graphUtils";
 import CourseNode from "./CourseNode";
+import CourseFormModal from "./CourseFormModal";
 import { Button } from "./ui/button";
-import { ArrowDown, ArrowRight, LayoutGrid, RotateCcw, Table, Workflow, Download, Code } from "lucide-react";
+import { ArrowDown, ArrowRight, LayoutGrid, RotateCcw, Table, Workflow, Download, Code, Plus, Upload } from "lucide-react";
 import { toPng } from "html-to-image";
 
 const nodeTypes = {
@@ -168,10 +169,12 @@ function CurriculumCanvas() {
   const selectedCourseId = useCourseStore((state) => state.selectedCourseId);
   const focusCourseId = useCourseStore((state) => state.focusCourseId);
   const setFocusCourseId = useCourseStore((state) => state.setFocusCourseId);
+  const openAddCourseModal = useCourseStore((state) => state.openAddCourseModal);
 
   const chartColors = useChartColors();
   const { fitView, setCenter } = useReactFlow();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const jsonInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -239,34 +242,38 @@ function CurriculumCanvas() {
     const set = new Set<string>();
     set.add(selectedCourseId);
 
-    const downstreamMap = new Map<string, string[]>();
-    const upstreamMap = new Map<string, string[]>();
-    courses.forEach(c => {
-      c.prerequisites.forEach(p => {
-        if (!downstreamMap.has(p)) downstreamMap.set(p, []);
-        downstreamMap.get(p)!.push(c.code);
-
-        if (!upstreamMap.has(c.code)) upstreamMap.set(c.code, []);
-        upstreamMap.get(c.code)!.push(p);
+    const findAncestors = (code: string) => {
+      const course = courses.find((c) => c.code === code);
+      if (!course) return;
+      course.prerequisites.forEach((p) => {
+        if (!set.has(p)) {
+          set.add(p);
+          findAncestors(p);
+        }
       });
-    });
-
-    const upQueue = [selectedCourseId];
-    while (upQueue.length) {
-      const curr = upQueue.shift()!;
-      (upstreamMap.get(curr) || []).forEach(p => {
-        if (!set.has(p)) { set.add(p); upQueue.push(p); }
+      (course.softPrerequisites ?? []).forEach((p) => {
+        if (!set.has(p)) {
+          set.add(p);
+          findAncestors(p);
+        }
       });
-    }
+    };
 
-    const downQueue = [selectedCourseId];
-    while (downQueue.length) {
-      const curr = downQueue.shift()!;
-      (downstreamMap.get(curr) || []).forEach(d => {
-        if (!set.has(d)) { set.add(d); downQueue.push(d); }
+    const findDescendants = (code: string) => {
+      courses.forEach((c) => {
+        if (
+          (c.prerequisites.includes(code) ||
+            (c.softPrerequisites ?? []).includes(code)) &&
+          !set.has(c.code)
+        ) {
+          set.add(c.code);
+          findDescendants(c.code);
+        }
       });
-    }
+    };
 
+    findAncestors(selectedCourseId);
+    findDescendants(selectedCourseId);
     return set;
   }, [selectedCourseId, courses]);
 
@@ -336,6 +343,29 @@ function CurriculumCanvas() {
     URL.revokeObjectURL(url);
   }, [courses]);
 
+  const handleImportJSON = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0].code === "string") {
+          setCourses(parsed);
+        } else {
+          alert("Invalid curriculum JSON file format.");
+        }
+      } catch (err) {
+        console.error("Import JSON failed", err);
+        alert("Failed to parse JSON file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }, [setCourses]);
+
   const directionButtonClass = (active: boolean) =>
     `flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
       active
@@ -358,9 +388,11 @@ function CurriculumCanvas() {
         fitView
         fitViewOptions={FIT_VIEW_OPTIONS}
         className="bg-transparent"
-        selectionOnDrag
-        panOnScroll
-        panOnDrag={false}
+        panOnDrag={true}
+        panOnScroll={true}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        selectionKeyCode="Shift"
         selectionMode={SelectionMode.Partial}
       >
         <Background
@@ -390,6 +422,21 @@ function CurriculumCanvas() {
             aria-label="Canvas tools"
             className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-1.5 shadow-xs"
           >
+            {/* Add Course Button */}
+            <Button
+              variant="default"
+              size="sm"
+              onClick={openAddCourseModal}
+              aria-label="Add Course"
+              title="Add a new course to curriculum"
+              className="h-7 px-2.5 text-xs font-semibold gap-1 rounded-lg"
+            >
+              <Plus className="size-3.5" />
+              <span>Add Course</span>
+            </Button>
+
+            <div className="h-5 w-px bg-border" aria-hidden="true" />
+
             <div
               role="group"
               aria-label="Arrangement"
@@ -467,6 +514,24 @@ function CurriculumCanvas() {
               <Code className="size-3.5" />
             </Button>
 
+            {/* Hidden JSON input */}
+            <input
+              type="file"
+              ref={jsonInputRef}
+              onChange={handleImportJSON}
+              accept=".json,application/json"
+              className="hidden"
+            />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => jsonInputRef.current?.click()}
+              aria-label="Import JSON"
+              title="Import Curriculum JSON"
+            >
+              <Upload className="size-3.5" />
+            </Button>
+
             <div className="h-5 w-px bg-border" aria-hidden="true" />
 
             <Button
@@ -536,6 +601,7 @@ export default function CurriculumFlow() {
   return (
     <ReactFlowProvider>
       <CurriculumCanvas />
+      <CourseFormModal />
     </ReactFlowProvider>
   );
 }

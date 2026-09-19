@@ -11,6 +11,9 @@ import {
   PanelLeftClose,
   Search,
   Activity,
+  Plus,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { analyzeBottlenecks } from "@/lib/graphUtils";
 
@@ -32,6 +35,9 @@ export default function DashboardRail({
   const courses = useCourseStore((state) => state.courses);
   const updateCourseStatus = useCourseStore((state) => state.updateCourseStatus);
   const setFocusCourseId = useCourseStore((state) => state.setFocusCourseId);
+  const openAddCourseModal = useCourseStore((state) => state.openAddCourseModal);
+  const openEditCourseModal = useCourseStore((state) => state.openEditCourseModal);
+  const deleteCourse = useCourseStore((state) => state.deleteCourse);
 
   const filteredCourses = useMemo(() => courses.filter((c) => 
     c.code.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -190,16 +196,27 @@ export default function DashboardRail({
             </>
           ) : activeTab === "courses" ? (
             <div className="flex flex-col gap-3">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search courses..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search courses..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={openAddCourseModal}
+                  className="h-8.5 px-2.5 text-xs font-semibold gap-1 rounded-md shrink-0"
+                >
+                  <Plus className="size-3.5" />
+                  <span className="hidden sm:inline">Add</span>
+                </Button>
               </div>
+
               <div className="flex flex-col gap-2">
                 {filteredCourses.length === 0 ? (
                   <div className="py-8 text-center text-xs text-muted-foreground">
@@ -207,35 +224,76 @@ export default function DashboardRail({
                   </div>
                 ) : (
                   filteredCourses.map((course) => (
-                <div key={course.code} className="flex flex-col gap-2 p-3 rounded-lg border border-border bg-card cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setFocusCourseId(course.code)}>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-semibold">{course.code}</span>
-                    <span className="text-xs text-muted-foreground line-clamp-1" title={course.title}>{course.title}</span>
-                  </div>
-                  <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => updateCourseStatus(course.code, "passed")}
-                      className={`flex-1 rounded py-1 text-[10px] font-medium border ${course.status === 'passed' ? 'bg-status-passed/20 border-status-passed text-status-passed' : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}
+                    <div
+                      key={course.code}
+                      className="group flex flex-col gap-2 p-3 rounded-lg border border-border bg-card cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => setFocusCourseId(course.code)}
                     >
-                      Passed
-                    </button>
-                    <button
-                      onClick={() => updateCourseStatus(course.code, "failed")}
-                      className={`flex-1 rounded py-1 text-[10px] font-medium border ${course.status === 'failed' ? 'bg-status-failed/20 border-status-failed text-status-failed' : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}
-                    >
-                      Failed
-                    </button>
-                    <button
-                      onClick={() => updateCourseStatus(course.code, "pending")}
-                      className={`flex-1 rounded py-1 text-[10px] font-medium border ${course.status === 'pending' ? 'bg-status-pending/20 border-status-pending text-foreground' : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}
-                    >
-                      Pending
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-            </div>
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold font-mono">{course.code}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              (Y{course.year}T{course.term} • {course.units}u)
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground line-clamp-1" title={course.title}>
+                            {course.title}
+                          </span>
+                        </div>
+
+                        {/* Inline Edit / Delete */}
+                        <div
+                          className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => openEditCourseModal(course)}
+                            title={`Edit ${course.code}`}
+                            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                          >
+                            <Edit2 className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Delete course ${course.code}?`)) {
+                                deleteCourse(course.code);
+                              }
+                            }}
+                            title={`Delete ${course.code}`}
+                            className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => updateCourseStatus(course.code, "passed")}
+                          className={`flex-1 rounded py-1 text-[10px] font-medium border ${course.status === 'passed' ? 'bg-status-passed/20 border-status-passed text-status-passed' : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}
+                        >
+                          Passed
+                        </button>
+                        <button
+                          onClick={() => updateCourseStatus(course.code, "failed")}
+                          className={`flex-1 rounded py-1 text-[10px] font-medium border ${course.status === 'failed' ? 'bg-status-failed/20 border-status-failed text-status-failed' : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}
+                        >
+                          Failed
+                        </button>
+                        <button
+                          onClick={() => updateCourseStatus(course.code, "pending")}
+                          className={`flex-1 rounded py-1 text-[10px] font-medium border ${course.status === 'pending' ? 'bg-status-pending/20 border-status-pending text-foreground' : 'border-border bg-background text-muted-foreground hover:bg-muted'}`}
+                        >
+                          Pending
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-4">

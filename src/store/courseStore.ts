@@ -59,6 +59,8 @@ interface CourseState {
   layoutMode: LayoutMode;
   selectedCourseId: string | null;
   focusCourseId: string | null;
+  courseModalOpen: boolean;
+  courseToEdit: Course | null;
   setCourses: (courses: Omit<Course, "status">[]) => void;
   setLayoutDirection: (direction: LayoutDirection) => void;
   setLayoutMode: (mode: LayoutMode) => void;
@@ -66,6 +68,12 @@ interface CourseState {
   updateCourseGrade: (code: string, grade?: number) => void;
   setSelectedCourseId: (id: string | null) => void;
   setFocusCourseId: (id: string | null) => void;
+  openAddCourseModal: () => void;
+  openEditCourseModal: (course: Course) => void;
+  closeCourseModal: () => void;
+  addCourse: (course: Omit<Course, "status">) => { success: boolean; error?: string };
+  editCourse: (originalCode: string, updated: Omit<Course, "status">) => { success: boolean; error?: string };
+  deleteCourse: (code: string) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -82,6 +90,12 @@ export const useCourseStore = create<CourseState>()(
       layoutMode: "flow",
       selectedCourseId: null,
       focusCourseId: null,
+      courseModalOpen: false,
+      courseToEdit: null,
+
+      openAddCourseModal: () => set({ courseModalOpen: true, courseToEdit: null }),
+      openEditCourseModal: (course) => set({ courseModalOpen: true, courseToEdit: course }),
+      closeCourseModal: () => set({ courseModalOpen: false, courseToEdit: null }),
 
   setCourses: (rawCourses) => {
     const initialCourses: Course[] = rawCourses.map((c) => ({
@@ -338,6 +352,156 @@ export const useCourseStore = create<CourseState>()(
         nodes,
         edges,
       };
+    });
+  },
+
+  addCourse: (courseData) => {
+    const trimmedCode = courseData.code.trim();
+    if (!trimmedCode) {
+      return { success: false, error: "Course code is required." };
+    }
+
+    const state = get();
+    const existing = state.courses.find(
+      (c) => c.code.toLowerCase() === trimmedCode.toLowerCase()
+    );
+    if (existing) {
+      return { success: false, error: `Course "${trimmedCode}" already exists.` };
+    }
+
+    const newCourse: Course = {
+      code: trimmedCode,
+      title: courseData.title.trim() || trimmedCode,
+      units: Number(courseData.units) || 3,
+      year: Number(courseData.year) || 1,
+      term: Number(courseData.term) || 1,
+      prerequisites: courseData.prerequisites ?? [],
+      softPrerequisites: courseData.softPrerequisites ?? [],
+      status: "pending",
+    };
+
+    const nextCourses = [...state.courses, newCourse];
+    const computedCourses = computeCourseStatuses(nextCourses);
+    const freshEdges = generateEdgesFromPrereqs(computedCourses);
+    const { nodes, edges } = applyLayout(
+      computedCourses,
+      freshEdges,
+      state.layoutMode,
+      state.layoutDirection
+    );
+
+    set({
+      courses: computedCourses,
+      nodes,
+      edges,
+      courseModalOpen: false,
+      courseToEdit: null,
+    });
+
+    return { success: true };
+  },
+
+  editCourse: (originalCode, updatedData) => {
+    const trimmedNewCode = updatedData.code.trim();
+    if (!trimmedNewCode) {
+      return { success: false, error: "Course code is required." };
+    }
+
+    const state = get();
+    // Check duplicate code if renamed
+    if (originalCode.toLowerCase() !== trimmedNewCode.toLowerCase()) {
+      const duplicate = state.courses.find(
+        (c) => c.code.toLowerCase() === trimmedNewCode.toLowerCase()
+      );
+      if (duplicate) {
+        return { success: false, error: `Course code "${trimmedNewCode}" already exists.` };
+      }
+    }
+
+    // Update target course and rename references in other courses' prerequisites
+    const updatedCourses = state.courses.map((course) => {
+      if (course.code === originalCode) {
+        return {
+          ...course,
+          code: trimmedNewCode,
+          title: updatedData.title.trim() || trimmedNewCode,
+          units: Number(updatedData.units) || course.units,
+          year: Number(updatedData.year) || course.year,
+          term: Number(updatedData.term) || course.term,
+          prerequisites: updatedData.prerequisites ?? [],
+          softPrerequisites: updatedData.softPrerequisites ?? [],
+        };
+      }
+
+      // If code was renamed, update any prerequisites pointing to originalCode
+      if (originalCode !== trimmedNewCode) {
+        const hasHard = course.prerequisites.includes(originalCode);
+        const hasSoft = (course.softPrerequisites ?? []).includes(originalCode);
+        if (hasHard || hasSoft) {
+          return {
+            ...course,
+            prerequisites: hasHard
+              ? course.prerequisites.map((p) => (p === originalCode ? trimmedNewCode : p))
+              : course.prerequisites,
+            softPrerequisites: hasSoft
+              ? (course.softPrerequisites ?? []).map((p) => (p === originalCode ? trimmedNewCode : p))
+              : course.softPrerequisites,
+          };
+        }
+      }
+
+      return course;
+    });
+
+    const computedCourses = computeCourseStatuses(updatedCourses);
+    const freshEdges = generateEdgesFromPrereqs(computedCourses);
+    const { nodes, edges } = applyLayout(
+      computedCourses,
+      freshEdges,
+      state.layoutMode,
+      state.layoutDirection
+    );
+
+    set({
+      courses: computedCourses,
+      nodes,
+      edges,
+      selectedCourseId: state.selectedCourseId === originalCode ? trimmedNewCode : state.selectedCourseId,
+      courseModalOpen: false,
+      courseToEdit: null,
+    });
+
+    return { success: true };
+  },
+
+  deleteCourse: (codeToDelete) => {
+    const state = get();
+    // Remove course and scrub prerequisite references
+    const updatedCourses = state.courses
+      .filter((c) => c.code !== codeToDelete)
+      .map((c) => ({
+        ...c,
+        prerequisites: c.prerequisites.filter((p) => p !== codeToDelete),
+        softPrerequisites: (c.softPrerequisites ?? []).filter((p) => p !== codeToDelete),
+      }));
+
+    const computedCourses = computeCourseStatuses(updatedCourses);
+    const freshEdges = generateEdgesFromPrereqs(computedCourses);
+    const { nodes, edges } = applyLayout(
+      computedCourses,
+      freshEdges,
+      state.layoutMode,
+      state.layoutDirection
+    );
+
+    set({
+      courses: computedCourses,
+      nodes,
+      edges,
+      selectedCourseId: state.selectedCourseId === codeToDelete ? null : state.selectedCourseId,
+      focusCourseId: state.focusCourseId === codeToDelete ? null : state.focusCourseId,
+      courseModalOpen: state.courseToEdit?.code === codeToDelete ? false : state.courseModalOpen,
+      courseToEdit: state.courseToEdit?.code === codeToDelete ? null : state.courseToEdit,
     });
   },
 
